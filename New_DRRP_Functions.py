@@ -158,7 +158,7 @@ def condition_number(matrix):
 #     else:
 #         return M
 
-def u_calibrated_full_mueller_polarimetry(thetas, a1, w1, w2, r1, r2, I_minus, I_plus, M_in=None):
+def q_calibrated_full_mueller_polarimetry(thetas, a1, w1, w2, r1, r2, I_minus, I_plus, M_in=None):
     nmeas = len(thetas)  # Number of measurements
     Wmat1 = np.zeros([nmeas, 16])
     Pmat1 = np.zeros([nmeas])
@@ -222,11 +222,12 @@ C = np.array([0, 1, 0, 0])
 #         prediction[i] = float(A @ linear_polarizer(a2+np.pi/2) @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
 #     return prediction
 
-def u_calibration_function(t, a1, w1, w2, r1, r2):
+def q_calibration_function(t, a1, w1, w2, r1, r2):
     prediction = [None]*len(t)
     for i in range(len(t)):
         prediction[i] = float(C @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
     return prediction
+
 
 # Basically the same as above, but with an optional input matrix to simulate data
 def output_simulation_function(t, a1, a2, w1, w2, r1, r2, LPA_angle=0, M_in=None):
@@ -239,6 +240,18 @@ def output_simulation_function(t, a1, a2, w1, w2, r1, r2, LPA_angle=0, M_in=None
     for i in range(len(t)):
         prediction[i] = float(A @ linear_polarizer(LPA_angle+a2) @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
     return prediction
+
+
+# Calculate the root-mean-square error of the calibration matrix by comparing wiht the identity matrix
+def RMS_calculator(calibration_matrix):
+    differences = []
+    for i in range(0, 3):
+        for j in range(0, 3):
+            differences.append(calibration_matrix[i, j]-M_identity[i, j])
+
+    differences_squared = [x**2 for x in differences]
+    RMS = np.sqrt(sum(differences_squared))/16
+    return RMS
 
 
 # After testing, each of the above functions works individually. Now combine them into one function to rule them all
@@ -285,23 +298,24 @@ def output_simulation_function(t, a1, a2, w1, w2, r1, r2, LPA_angle=0, M_in=None
 
 #     return Ml, Mr, avg_retardance
 
-def u_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, sample_angles, sample_left_intensity, sample_right_intensity):
+def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, sample_angles, sample_left_intensity, sample_right_intensity):
     QCal = cal_right_intensity - cal_left_intensity # Plus should be the right spot, minus the left spot
     initial_guess = [0, 0, 0, 0, 0]
     parameter_bounds = ([-np.pi, -np.pi, -np.pi, -np.pi/2, -np.pi/2], [np.pi, np.pi, np.pi, np.pi/2, np.pi/2])
 
     # Find parameters from calibration of the left spot
     normalized_QCal = QCal/(max(QCal))
-    popt, pcov = curve_fit(u_calibration_function, cal_angles, normalized_QCal, p0=initial_guess, bounds=parameter_bounds)
+    popt, pcov = curve_fit(q_calibration_function, cal_angles, normalized_QCal, p0=initial_guess, bounds=parameter_bounds)
     print(popt, "Fit parameters for a1, w1, w2, r1, and r2. 1 for generator, 2 for analyzer")
 
     # The calibration matrix (should be close to identity) to see how well the parameters compensate
-    MCal = u_calibrated_full_mueller_polarimetry(cal_angles, popt[0], popt[1], popt[2], popt[3], popt[4], cal_left_intensity, cal_right_intensity)
+    MCal = q_calibrated_full_mueller_polarimetry(cal_angles, popt[0], popt[1], popt[2], popt[3], popt[4], cal_left_intensity, cal_right_intensity)
     MCal = MCal/np.max(MCal)
+    RMS_error = RMS_calculator(MCal)
     #print(MCal, " This is the calibration Mueller Matrix.")
 
     # Use the parameters found above from curve fitting to construct the actual Mueller matrix of the sample
-    MSample = u_calibrated_full_mueller_polarimetry(sample_angles, popt[0], popt[1], popt[2], popt[3], popt[4], sample_left_intensity, sample_right_intensity)
+    MSample = q_calibrated_full_mueller_polarimetry(sample_angles, popt[0], popt[1], popt[2], popt[3], popt[4], sample_left_intensity, sample_right_intensity)
     MSample = MSample/np.max(MSample)
 
     np.set_printoptions(suppress=True) # Suppresses scientific notation, keeps decimal format
@@ -310,5 +324,5 @@ def u_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     retardance = np.arccos(MSample[3,3])/(2*np.pi)
     print(retardance, ' This is the retardance found from the data after calibration.')
 
-    return MSample, retardance
+    return MSample, retardance, MCal, RMS_error
 
