@@ -232,20 +232,20 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
 
     # The calibration matrix (should be close to identity) to see how well the parameters compensate
     MCal = q_calibrated_full_mueller_polarimetry(cal_angles, popt[0], popt[1], popt[2], popt[3], popt[4], cal_left_intensity, cal_right_intensity)
-    MCal = MCal/np.max(MCal)
+    MCal = MCal/np.max(np.abs(MCal))
     RMS_Error = RMS_calculator(MCal)
     #print(MCal, " This is the calibration Mueller Matrix.")
 
     # Use the parameters found above from curve fitting to construct the actual Mueller matrix of the sample
     MSample = q_calibrated_full_mueller_polarimetry(sample_angles, popt[0], popt[1], popt[2], popt[3], popt[4], sample_left_intensity, sample_right_intensity)
-    MSample = MSample/np.max(MSample)
+    MSample = MSample/np.max(np.abs(MSample))
 
     np.set_printoptions(suppress=True) # Suppresses scientific notation, keeps decimal format
 
     # Extract retardance from the last entry of the mueller matrix, which should just be cos(phi)
     retardance = np.arccos(MSample[3,3])/(2*np.pi)
     print(retardance, ' This is the retardance found from the data after calibration.')
-    #Retardance_Error = retardance_error(MSample, retardance, MCal)
+    Retardance_Error = retardance_error(MSample, retardance, MCal)
 
-    return MSample, retardance, MCal, RMS_Error, #Retardance_Error
+    return MSample, retardance, MCal, RMS_Error, Retardance_Error
 
