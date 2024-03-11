@@ -7,6 +7,7 @@ from astropy.io import fits
 import os
 import re
 from scipy.optimize import curve_fit
+import csv
 
 # Mueller matrix for a linear polarizer, with angle a between transmission axis and horizontal (radians)
 def linear_polarizer(a):
@@ -209,8 +210,31 @@ def RMS_calculator(calibration_matrix):
 # Instead of calculating error from the whole calibration matrix, just look at the last input which gives the retardance
 def retardance_error(M_sample, retardance, M_cal):
 # Use the difference between the identity matrix and the retardance input of the calibration matrix. Might use RMS of whole M_cal instead later
-    lower_retardance = np.arccos(M_sample[3, 3] + (1 - M_cal[3, 3]))/(2*np.pi)
-    upper_retardance = np.arccos(M_sample[3, 3] - (1 - M_cal[3, 3]))/(2*np.pi)
+    last_sum = M_sample[3, 3] + (1 - M_cal[3, 3])
+    last_difference = M_sample[3, 3] - (1 - M_cal[3, 3])
+    if last_sum > 1:
+        last_sum = 1
+    if last_difference < -1:
+        last_difference = -1
+
+    lower_retardance = np.arccos(last_sum)/(2*np.pi)
+    upper_retardance = np.arccos(last_difference)/(2*np.pi)
+
+    lower_retardance_error = retardance - lower_retardance
+    upper_retardance_error = upper_retardance - retardance
+    retardance_error = [lower_retardance_error, upper_retardance_error]
+    return retardance_error
+
+
+def retardance_error2(M_sample, retardance, RMS):
+    last_difference = M_sample[3, 3] - RMS
+    last_sum = M_sample[3, 3] + RMS
+    if last_sum > 1:
+        last_sum = 1
+    if last_difference < -1:
+        last_difference = -1
+    lower_retardance = np.arccos(last_sum)/(2*np.pi)
+    upper_retardance = np.arccos(last_difference)/(2*np.pi)
 
     lower_retardance_error = retardance - lower_retardance
     #print(retardance, lower_retardance)
@@ -244,8 +268,9 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
 
     # Extract retardance from the last entry of the mueller matrix, which should just be cos(phi)
     retardance = np.arccos(MSample[3,3])/(2*np.pi)
-    print(retardance, ' This is the retardance found from the data after calibration.')
-    Retardance_Error = retardance_error(MSample, retardance, MCal)
+    #print(retardance, ' This is the retardance found from the data after calibration.')
+    #Retardance_Error = retardance_error(MSample, retardance, MCal)
+    Retardance_Error = retardance_error2(MSample, retardance, RMS_Error)
 
     return MSample, retardance, MCal, RMS_Error, Retardance_Error
 
