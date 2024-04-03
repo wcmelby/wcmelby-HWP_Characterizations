@@ -8,6 +8,7 @@ import os
 import re
 from scipy.optimize import curve_fit
 import csv
+import random
 
 # Mueller matrix for a linear polarizer, with angle a between transmission axis and horizontal (radians)
 def linear_polarizer(a):
@@ -175,6 +176,7 @@ B = np.array([[1], [0], [0], [0]])
 C = np.array([0, 1, 0, 0])
 
 
+# In order, the calibration parameters are LP1 angle, QWP1 axis angle, QWP2 axis angle, QWP1 retardance, QWP2 retrdance
 def q_calibration_function(t, a1, w1, w2, r1, r2):
     prediction = [None]*len(t)
     for i in range(len(t)):
@@ -209,7 +211,7 @@ def RMS_calculator(calibration_matrix):
 
 # Instead of calculating error from the whole calibration matrix, just look at the last input which gives the retardance
 def retardance_error(M_sample, retardance, M_cal):
-# Use the difference between the identity matrix and the retardance input of the calibration matrix. Might use RMS of whole M_cal instead later
+# Use the difference between the identity matrix and the retardance input of the calibration matrix
     last_sum = M_sample[3, 3] + (1 - M_cal[3, 3])
     last_difference = M_sample[3, 3] - (1 - M_cal[3, 3])
     if last_sum > 1:
@@ -226,6 +228,7 @@ def retardance_error(M_sample, retardance, M_cal):
     return retardance_error
 
 
+# This version uses the RMS error of the whole calibration matrix instead of just the last value for retardance
 def retardance_error2(M_sample, retardance, RMS):
     last_difference = M_sample[3, 3] - RMS
     last_sum = M_sample[3, 3] + RMS
