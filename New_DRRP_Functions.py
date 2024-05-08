@@ -274,8 +274,9 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     # Extract retardance from the last entry of the mueller matrix, which should just be cos(phi)
     retardance = np.arccos(MSample[3,3])/(2*np.pi)
     #print(retardance, ' This is the retardance found from the data after calibration.')
-    #Retardance_Error = retardance_error(MSample, retardance, MCal)
-    Retardance_Error = retardance_error2(MSample, retardance, RMS_Error)
+    Retardance_Error = retardance_error(MSample, retardance, MCal)
+    Retardance_Error2 = retardance_error2(MSample, retardance, RMS_Error)
 
-    return MSample, retardance, MCal, RMS_Error, Retardance_Error
+
+    return MSample, retardance, MCal, RMS_Error, Retardance_Error2, Retardance_Error
 
