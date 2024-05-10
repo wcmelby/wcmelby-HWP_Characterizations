@@ -272,11 +272,136 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     np.set_printoptions(suppress=True) # Suppresses scientific notation, keeps decimal format
 
     # Extract retardance from the last entry of the mueller matrix, which should just be cos(phi)
-    retardance = np.arccos(MSample[3,3])/(2*np.pi)
-    #print(retardance, ' This is the retardance found from the data after calibration.')
-    Retardance_Error = retardance_error(MSample, retardance, MCal)
-    Retardance_Error2 = retardance_error2(MSample, retardance, RMS_Error)
+    #retardance = np.arccos(MSample[3,3])/(2*np.pi)
+    r_decomposed_MSample = decompose_retarder(MSample)     # Use the polar decomposition of the retarder matrix
+    retardance = np.arccos(r_decomposed_MSample[3,3])/(2*np.pi) 
+
+    Retardance_Error = retardance_error(r_decomposed_MSample, retardance, MCal)
+    Retardance_Error2 = retardance_error2(r_decomposed_MSample, retardance, RMS_Error)  # Uses RMS of the whole calibration matrix
 
 
     return MSample, retardance, MCal, RMS_Error, Retardance_Error2, Retardance_Error
 
+
+
+# Functions from Jaren's katsu code on Polar decomposition. Inspired by Lu & Chipman 1996 https://doi.org/10.1364/JOSAA.13.001106
+
+def broadcast_outer(a,b):
+    """broadcasted outer product of two A,B,...,N vectors. Used for polarimetric data reduction
+    where out is a A,B,...,N,N matrix. While in principle this does not require vectors of different length, it is not tested
+    to produce anything other than square matrices.
+    Parameters
+    ----------
+    a : numpy.ndarray
+        A,B,...,N vector 1
+    b : numpy.ndarray
+        A,B,...,N vector 2
+    Returns
+    -------
+    numpy.ndarray
+        outer product matrix
+    """
+    return np.einsum('...i,...j->...ij',a,b)
+
+def _empty_mueller(shape):
+    """Returns an empty array to populate with Mueller matrix elements.
+    Parameters
+    ----------
+    shape : list
+        shape to prepend to the mueller matrix array. shape = [32,32] returns an array of shape [32,32,2,2]
+        where the matrix is assumed to be in the last indices. Defaults to None, which returns a 2x2 array.
+    Returns
+    -------
+    numpy.ndarray
+        The zero array of specified shape
+    Notes
+    -----
+    The structure of this function was taken from prysm.x.polarization, which was written by Jaren Ashcraft
+    """
+    if shape is None:
+        shape = (4, 4)
+    else:
+        shape = (*shape, 4, 4)
+    return np.zeros(shape)
+
+
+def decompose_diattenuator(M):
+    """Decompose M into a diattenuator using the Polar decomposition from Lu & Chipman 1996 https://doi.org/10.1364/JOSAA.13.001106
+    Parameters
+    ----------
+    M : numpy.ndarray
+        Mueller Matrix to decompose
+    Returns
+    -------
+    numpy.ndarray
+        Diattenuator component of mueller matrix
+    """
+    # First, determine the diattenuator
+    T = M[..., 0, 0]
+    if M.ndim > 2:
+        diattenuation_vector = M[..., 0, 1:] / T[..., np.newaxis]
+    else:
+        diattenuation_vector = M[..., 0, 1:] / T
+
+    D = np.sqrt(np.sum(diattenuation_vector * diattenuation_vector, axis=-1))
+    mD = np.sqrt(1 - D**2)
+
+    if M.ndim > 2:
+        diattenutation_norm = diattenuation_vector / D[..., np.newaxis]
+    else:
+        diattenutation_norm = diattenuation_vector / D
+
+    # DD = diattenutation_norm @ np.swapaxes(diattenutation_norm,-2,-1)
+    DD = broadcast_outer(diattenutation_norm, diattenutation_norm)
+
+    # create diattenuator
+    I = np.identity(3)
+
+    if M.ndim > 2:
+        I = np.broadcast_to(I, [*M.shape[:-2], 3, 3])
+        mD = mD[..., np.newaxis, np.newaxis]
+
+    inner_diattenuator = mD * I + (1 - mD) * DD # Eq. 19 Lu & Chipman
+
+    Md = _empty_mueller(M.shape[:-2])
+
+    # Eq 18 Lu & Chipman
+    Md[..., 0, 0] = 1.
+    Md[..., 0, 1:] = diattenuation_vector
+    Md[..., 1:, 0] = diattenuation_vector
+    Md[..., 1:, 1:] = inner_diattenuator
+
+    if M.ndim > 2:
+        Md = Md * T[..., np.newaxis, np.newaxis]
+    else:
+        Md = Md * T
+
+    return Md
+
+
+def decompose_retarder(M, return_all=False):
+    """Decompose M into a retarder using the Polar decomposition from Lu & Chipman 1996 https://doi.org/10.1364/JOSAA.13.001106
+    Note: this doesn't work if the diattenuation can be described by a pure polarizer,
+    because the matrix is singular and therefore non-invertible
+    Parameters
+    ----------
+    M : numpy.ndarray
+        Mueller Matrix to decompose
+    return_all : bool
+        Whether to return the retarder and diattenuator vs just the retarder.
+        Defaults to False, which returns both
+    Returns
+    -------
+    numpy.ndarray
+        Retarder component of mueller matrix
+    """
+    Md = decompose_diattenuator(M)
+    
+    # Then, derive the retarder
+    Mr = M @ np.linalg.inv(Md)
+
+    if return_all:
+        return Mr, Md 
+    else:
+        return Mr
+    
