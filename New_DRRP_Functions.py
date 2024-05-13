@@ -399,6 +399,7 @@ def decompose_retarder(M, return_all=False):
     
     # Then, derive the retarder
     Mr = M @ np.linalg.inv(Md)
+    Mr = Mr/np.max(Mr)   # remember to normalize the matrix
 
     if return_all:
         return Mr, Md 
