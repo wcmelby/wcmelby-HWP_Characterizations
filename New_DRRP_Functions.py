@@ -202,12 +202,12 @@ def output_simulation_function(t, a1, a2, w1, w2, r1, r2, LPA_angle=0, M_in=None
 # Calculate the root-mean-square error of the calibration matrix by comparing with the identity matrix
 def RMS_calculator(calibration_matrix):
     differences = []
-    for i in range(0, 3):
-        for j in range(0, 3):
+    for i in range(0, 4):
+        for j in range(0, 4):
             differences.append(calibration_matrix[i, j]-M_identity[i, j])
 
     differences_squared = [x**2 for x in differences]
-    RMS = np.sqrt(sum(differences_squared))/16
+    RMS = np.sqrt(sum(differences_squared)/16)
     return RMS
 
 
@@ -247,6 +247,10 @@ def retardance_error2(M_sample, retardance, RMS):
     retardance_error = [lower_retardance_error, upper_retardance_error]
     return retardance_error
 
+# Calculate the retardance error by standard error propogation using RMS in the matrix elements from calibration
+def propagated_error(M_R, RMS):
+    return RMS/np.sqrt(1-(np.trace(M_R)/2-1)**2)
+
 
 # The function that gives everything you want to know at once
 def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, sample_angles, sample_left_intensity, sample_right_intensity):
@@ -273,14 +277,15 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
 
     # Extract retardance from the last entry of the mueller matrix, which should just be cos(phi)
     #retardance = np.arccos(MSample[3,3])/(2*np.pi)
-    r_decomposed_MSample = decompose_retarder(MSample)     # Use the polar decomposition of the retarder matrix
-    retardance = np.arccos(r_decomposed_MSample[3,3])/(2*np.pi) 
+    r_decomposed_MSample = decompose_retarder(MSample)     # Use the polar decomposition of the retarder matrix and methods of Lu and Chiman 1996
+    #retardance = np.arccos(r_decomposed_MSample[3,3])/(2*np.pi) 
+    retardance = np.arccos(np.trace(decompose_retarder(r_decomposed_MSample))/2 - 1)/(2*np.pi)
 
-    Retardance_Error = retardance_error(r_decomposed_MSample, retardance, MCal)
-    Retardance_Error2 = retardance_error2(r_decomposed_MSample, retardance, RMS_Error)  # Uses RMS of the whole calibration matrix
+    Retardance_Error = propagated_error(r_decomposed_MSample, RMS_Error)
+    #Retardance_Error = retardance_error(r_decomposed_MSample, retardance, MCal)
+    #Retardance_Error2 = retardance_error2(r_decomposed_MSample, retardance, RMS_Error)  # Uses RMS of the whole calibration matrix
 
-
-    return MSample, retardance, MCal, RMS_Error, Retardance_Error2, Retardance_Error
+    return MSample, retardance, MCal, RMS_Error, Retardance_Error 
 
 
 
@@ -375,6 +380,8 @@ def decompose_diattenuator(M):
         Md = Md * T[..., np.newaxis, np.newaxis]
     else:
         Md = Md * T
+    
+    Md = Md/np.max(np.abs(Md))   # remember to normalize the matrix
 
     return Md
 
@@ -399,7 +406,7 @@ def decompose_retarder(M, return_all=False):
     
     # Then, derive the retarder
     Mr = M @ np.linalg.inv(Md)
-    Mr = Mr/np.max(Mr)   # remember to normalize the matrix
+    Mr = Mr/np.max(np.abs(Mr))   # remember to normalize the matrix
 
     if return_all:
         return Mr, Md 
