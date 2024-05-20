@@ -135,8 +135,10 @@ def q_calibrated_full_mueller_polarimetry(thetas, a1, w1, w2, r1, r2, I_minus, I
     Wmat2 = np.zeros([nmeas, 16])
     Pmat2 = np.zeros([nmeas])
     th = thetas
-    Q = I_plus - I_minus   # Difference in intensities measured by the detector. Plus should be the right spot, minus the left spot
-    I_total = I_plus + I_minus
+    unnormalized_Q = I_plus - I_minus   # Difference in intensities measured by the detector. Plus should be the right spot, minus the left spot
+    unnormalized_I_total = I_plus + I_minus
+    Q = unnormalized_Q/np.max(unnormalized_I_total)
+    I_total = unnormalized_I_total/np.max(unnormalized_I_total)
 
     for i in range(nmeas):
         # Mueller Matrix of generator (linear polarizer and a quarter wave plate)
@@ -187,7 +189,7 @@ def q_calibration_function(t, a1, w1, w2, r1, r2):
 
 
 # Basically the same as above, but with an optional input matrix to simulate data
-def output_simulation_function(t, a1, a2, w1, w2, r1, r2, LPA_angle=0, M_in=None):
+def q_output_simulation_function(t, a1, w1, w2, r1, r2, M_in=None):
     if M_in is None:
         M = M_identity
     else:
@@ -195,7 +197,18 @@ def output_simulation_function(t, a1, a2, w1, w2, r1, r2, LPA_angle=0, M_in=None
 
     prediction = [None]*len(t)
     for i in range(len(t)):
-        prediction[i] = float(A @ linear_polarizer(LPA_angle+a2) @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
+        prediction[i] = float(C @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
+    return prediction
+
+def I_output_simulation_function(t, a1, w1, w2, r1, r2, M_in=None):
+    if M_in is None:
+        M = M_identity
+    else:
+        M = M_in
+
+    prediction = [None]*len(t)
+    for i in range(len(t)):
+        prediction[i] = float(A  @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
     return prediction
 
 
@@ -249,17 +262,20 @@ def retardance_error2(M_sample, retardance, RMS):
 
 # Calculate the retardance error by standard error propogation using RMS in the matrix elements from calibration
 def propagated_error(M_R, RMS):
-    return RMS/np.sqrt(1-(np.trace(M_R)/2-1)**2)
+    # return RMS/np.sqrt(1-(np.trace(M_R)/2-1)**2)
+    x = np.trace(M_R)
+    return 2*RMS/np.sqrt(4*x-x**2)
 
 
 # The function that gives everything you want to know at once
 def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, sample_angles, sample_left_intensity, sample_right_intensity):
+    ICal = cal_right_intensity + cal_left_intensity
     QCal = cal_right_intensity - cal_left_intensity # Plus should be the right spot, minus the left spot
     initial_guess = [0, 0, 0, 0, 0]
     parameter_bounds = ([-np.pi, -np.pi, -np.pi, -np.pi/2, -np.pi/2], [np.pi, np.pi, np.pi, np.pi/2, np.pi/2])
 
-    # Find parameters from calibration of the left spot
-    normalized_QCal = QCal/(max(QCal))
+    # Find parameters from calibration 
+    normalized_QCal = QCal/(max(ICal))
     popt, pcov = curve_fit(q_calibration_function, cal_angles, normalized_QCal, p0=initial_guess, bounds=parameter_bounds)
     print(popt, "Fit parameters for a1, w1, w2, r1, and r2. 1 for generator, 2 for analyzer")
 
@@ -278,13 +294,10 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     # Extract retardance from the last entry of the mueller matrix, which should just be cos(phi)
     #retardance = np.arccos(MSample[3,3])/(2*np.pi)
     r_decomposed_MSample = decompose_retarder(MSample)     # Use the polar decomposition of the retarder matrix and methods of Lu and Chiman 1996
-    #retardance = np.arccos(r_decomposed_MSample[3,3])/(2*np.pi) 
     retardance = np.arccos(np.trace(decompose_retarder(r_decomposed_MSample))/2 - 1)/(2*np.pi)
 
     Retardance_Error = propagated_error(r_decomposed_MSample, RMS_Error)
-    #Retardance_Error = retardance_error(r_decomposed_MSample, retardance, MCal)
-    #Retardance_Error2 = retardance_error2(r_decomposed_MSample, retardance, RMS_Error)  # Uses RMS of the whole calibration matrix
-
+    
     return MSample, retardance, MCal, RMS_Error, Retardance_Error 
 
 
