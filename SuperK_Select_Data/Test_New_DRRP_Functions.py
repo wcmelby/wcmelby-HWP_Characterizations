@@ -135,10 +135,15 @@ def q_calibrated_full_mueller_polarimetry(thetas, a1, w1, w2, r1, r2, I_minus, I
     Wmat2 = np.zeros([nmeas, 16])
     Pmat2 = np.zeros([nmeas])
     th = thetas
-    unnormalized_Q = I_plus - I_minus   # Difference in intensities measured by the detector. Plus should be the right spot, minus the left spot
-    unnormalized_I_total = I_plus + I_minus
-    Q = unnormalized_Q/np.max(unnormalized_I_total)
-    I_total = unnormalized_I_total/np.max(unnormalized_I_total)
+    # unnormalized_Q = I_plus - I_minus   # Difference in intensities measured by the detector. Plus should be the right spot, minus the left spot
+    # unnormalized_I_total = I_plus + I_minus
+    # Q = unnormalized_Q/np.max(unnormalized_I_total)
+    # #Q = (I_plus - I_minus)/(I_plus + I_minus)
+    # I_total = unnormalized_I_total/np.max(unnormalized_I_total)
+    # # I_total = (I_plus + I_minus)/np.max(I_plus + I_minus)
+
+    I_total = (I_plus + I_minus)/np.max(I_plus + I_minus)
+    Q = (I_plus - I_minus)/(I_plus + I_minus)
 
     for i in range(nmeas):
         # Mueller Matrix of generator (linear polarizer and a quarter wave plate)
@@ -269,15 +274,23 @@ def propagated_error(M_R, RMS):
 
 # The function that gives everything you want to know at once
 def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, sample_angles, sample_left_intensity, sample_right_intensity):
-    ICal = cal_right_intensity + cal_left_intensity  # Plus should be the right spot, minus is the left spot
+    ICal = cal_right_intensity + cal_left_intensity
     QCal = cal_right_intensity - cal_left_intensity # before changes
+
+    # ICal = (cal_right_intensity + cal_left_intensity)/np.max(cal_right_intensity + cal_left_intensity)
+    # QCal = (cal_right_intensity - cal_left_intensity)/(cal_right_intensity + cal_left_intensity) # Plus should be the right spot, minus the left spot
     initial_guess = [0, 0, 0, 0, 0]
     parameter_bounds = ([-np.pi, -np.pi, -np.pi, -np.pi/2, -np.pi/2], [np.pi, np.pi, np.pi, np.pi/2, np.pi/2])
 
     # Find parameters from calibration 
-    normalized_QCal = QCal/(max(ICal))
+    #normalized_QCal = QCal/(max(ICal))
+    # normalized_QCal = QCal/max(np.abs(QCal))
+    normalized_QCal = QCal/ICal
     popt, pcov = curve_fit(q_calibration_function, cal_angles, normalized_QCal, p0=initial_guess, bounds=parameter_bounds)
     print(popt, "Fit parameters for a1, w1, w2, r1, and r2. 1 for generator, 2 for analyzer")
+    print(ICal)
+    print(QCal)
+    print(normalized_QCal)
 
     # The calibration matrix (should be close to identity) to see how well the parameters compensate
     MCal = q_calibrated_full_mueller_polarimetry(cal_angles, popt[0], popt[1], popt[2], popt[3], popt[4], cal_left_intensity, cal_right_intensity)
@@ -295,6 +308,11 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     #retardance = np.arccos(MSample[3,3])/(2*np.pi)
     r_decomposed_MSample = decompose_retarder(MSample)     # Use the polar decomposition of the retarder matrix and methods of Lu and Chiman 1996
     retardance = np.arccos(np.trace(decompose_retarder(r_decomposed_MSample))/2 - 1)/(2*np.pi)
+    
+    # trace = np.trace(decompose_retarder(r_decomposed_MSample))
+    # if trace < 0:
+    #     trace = 1 - trace
+    # retardance = np.arccos(trace/2 - 1)/(2*np.pi)
 
     Retardance_Error = propagated_error(r_decomposed_MSample, RMS_Error)
     
