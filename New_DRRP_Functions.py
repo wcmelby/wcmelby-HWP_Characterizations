@@ -197,9 +197,10 @@ def q_output_simulation_function(t, a1, w1, w2, r1, r2, M_in=None):
 
     prediction = [None]*len(t)
     for i in range(len(t)):
-        prediction[i] = float(C @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
+        prediction[i] = float(C @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
     return prediction
 
+# Function that is useful for generating intensity values for a given sample matrix and offset parameters
 def I_output_simulation_function(t, a1, w1, w2, r1, r2, M_in=None):
     if M_in is None:
         M = M_identity
@@ -208,7 +209,7 @@ def I_output_simulation_function(t, a1, w1, w2, r1, r2, M_in=None):
 
     prediction = [None]*len(t)
     for i in range(len(t)):
-        prediction[i] = float(A  @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
+        prediction[i] = float(A  @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
     return prediction
 
 
@@ -225,40 +226,40 @@ def RMS_calculator(calibration_matrix):
 
 
 # Instead of calculating error from the whole calibration matrix, just look at the last input which gives the retardance
-def retardance_error(M_sample, retardance, M_cal):
-# Use the difference between the identity matrix and the retardance input of the calibration matrix
-    last_sum = M_sample[3, 3] + (1 - M_cal[3, 3])
-    last_difference = M_sample[3, 3] - (1 - M_cal[3, 3])
-    if last_sum > 1:
-        last_sum = 1
-    if last_difference < -1:
-        last_difference = -1
+# def retardance_error(M_sample, retardance, M_cal):
+# # Use the difference between the identity matrix and the retardance input of the calibration matrix
+#     last_sum = M_sample[3, 3] + (1 - M_cal[3, 3])
+#     last_difference = M_sample[3, 3] - (1 - M_cal[3, 3])
+#     if last_sum > 1:
+#         last_sum = 1
+#     if last_difference < -1:
+#         last_difference = -1
 
-    lower_retardance = np.arccos(last_sum)/(2*np.pi)
-    upper_retardance = np.arccos(last_difference)/(2*np.pi)
+#     lower_retardance = np.arccos(last_sum)/(2*np.pi)
+#     upper_retardance = np.arccos(last_difference)/(2*np.pi)
 
-    lower_retardance_error = retardance - lower_retardance
-    upper_retardance_error = upper_retardance - retardance
-    retardance_error = [lower_retardance_error, upper_retardance_error]
-    return retardance_error
+#     lower_retardance_error = retardance - lower_retardance
+#     upper_retardance_error = upper_retardance - retardance
+#     retardance_error = [lower_retardance_error, upper_retardance_error]
+#     return retardance_error
 
 
 # This version uses the RMS error of the whole calibration matrix instead of just the last value for retardance
-def retardance_error2(M_sample, retardance, RMS):
-    last_difference = M_sample[3, 3] - RMS
-    last_sum = M_sample[3, 3] + RMS
-    if last_sum > 1:
-        last_sum = 1
-    if last_difference < -1:
-        last_difference = -1
-    lower_retardance = np.arccos(last_sum)/(2*np.pi)
-    upper_retardance = np.arccos(last_difference)/(2*np.pi)
+# def retardance_error2(M_sample, retardance, RMS):
+#     last_difference = M_sample[3, 3] - RMS
+#     last_sum = M_sample[3, 3] + RMS
+#     if last_sum > 1:
+#         last_sum = 1
+#     if last_difference < -1:
+#         last_difference = -1
+#     lower_retardance = np.arccos(last_sum)/(2*np.pi)
+#     upper_retardance = np.arccos(last_difference)/(2*np.pi)
 
-    lower_retardance_error = retardance - lower_retardance
-    #print(retardance, lower_retardance)
-    upper_retardance_error = upper_retardance - retardance
-    retardance_error = [lower_retardance_error, upper_retardance_error]
-    return retardance_error
+#     lower_retardance_error = retardance - lower_retardance
+#     #print(retardance, lower_retardance)
+#     upper_retardance_error = upper_retardance - retardance
+#     retardance_error = [lower_retardance_error, upper_retardance_error]
+#     return retardance_error
 
 # Calculate the retardance error by standard error propogation using RMS in the matrix elements from calibration
 def propagated_error(M_R, RMS):
