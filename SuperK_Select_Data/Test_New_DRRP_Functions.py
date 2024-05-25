@@ -137,13 +137,13 @@ def q_calibrated_full_mueller_polarimetry(thetas, a1, w1, w2, r1, r2, I_minus, I
     th = thetas
     unnormalized_Q = I_plus - I_minus   # Difference in intensities measured by the detector. Plus should be the right spot, minus the left spot
     unnormalized_I_total = I_plus + I_minus
-    Q = unnormalized_Q/np.max(unnormalized_I_total)
+    #Q = unnormalized_Q/np.max(unnormalized_I_total)
     # #Q = (I_plus - I_minus)/(I_plus + I_minus)
-    I_total = unnormalized_I_total/np.max(unnormalized_I_total)
+    #I_total = unnormalized_I_total/np.max(unnormalized_I_total)
     # # I_total = (I_plus + I_minus)/np.max(I_plus + I_minus)
 
-    # I_total = (I_plus + I_minus)/np.max(I_plus + I_minus)
-    # Q = (I_plus - I_minus)/(2*(I_plus + I_minus)) # try dividing by 2?
+    I_total = (I_plus + I_minus)/np.max(I_plus + I_minus) # This makes it worse for some reason
+    Q = (I_plus - I_minus)/(I_plus + I_minus)
 
     for i in range(nmeas):
         # Mueller Matrix of generator (linear polarizer and a quarter wave plate)
@@ -186,11 +186,11 @@ C = np.array([0, 1, 0, 0])
 
 
 # In order, the calibration parameters are LP1 angle, QWP1 axis angle, QWP2 axis angle, QWP1 retardance, QWP2 retrdance
-def q_calibration_function(t, a1, w1, w2, r1, r2):
-    prediction = [None]*len(t)
-    for i in range(len(t)):
-        prediction[i] = float(C @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
-    return prediction
+# def q_calibration_function(t, a1, w1, w2, r1, r2):
+#     prediction = [None]*len(t)
+#     for i in range(len(t)):
+#         prediction[i] = float(C @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
+#     return prediction
 
 
 # Basically the same as above, but with an optional input matrix to simulate data
@@ -289,6 +289,13 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     #normalized_QCal = QCal/ICal
     #normalized_QCal = QCal/(2*ICal) # try dividing by 2?
     #normalized_QCal = QCal/(ICal)
+    def q_calibration_function(t, a1, w1, w2, r1, r2):
+        prediction = [None]*len(t)
+        for i in range(len(t)):
+            I = np.array([[ICal[i]], [0], [0], [0]])
+            prediction[i] = float(C @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ I)
+        return prediction
+
     popt, pcov = curve_fit(q_calibration_function, cal_angles, QCal, p0=initial_guess, bounds=parameter_bounds)
     print(popt, "Fit parameters for a1, w1, w2, r1, and r2. 1 for generator, 2 for analyzer")
     #print(ICal)
