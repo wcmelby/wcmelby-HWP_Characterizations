@@ -225,42 +225,6 @@ def RMS_calculator(calibration_matrix):
     return RMS
 
 
-# Instead of calculating error from the whole calibration matrix, just look at the last input which gives the retardance
-# def retardance_error(M_sample, retardance, M_cal):
-# # Use the difference between the identity matrix and the retardance input of the calibration matrix
-#     last_sum = M_sample[3, 3] + (1 - M_cal[3, 3])
-#     last_difference = M_sample[3, 3] - (1 - M_cal[3, 3])
-#     if last_sum > 1:
-#         last_sum = 1
-#     if last_difference < -1:
-#         last_difference = -1
-
-#     lower_retardance = np.arccos(last_sum)/(2*np.pi)
-#     upper_retardance = np.arccos(last_difference)/(2*np.pi)
-
-#     lower_retardance_error = retardance - lower_retardance
-#     upper_retardance_error = upper_retardance - retardance
-#     retardance_error = [lower_retardance_error, upper_retardance_error]
-#     return retardance_error
-
-
-# This version uses the RMS error of the whole calibration matrix instead of just the last value for retardance
-# def retardance_error2(M_sample, retardance, RMS):
-#     last_difference = M_sample[3, 3] - RMS
-#     last_sum = M_sample[3, 3] + RMS
-#     if last_sum > 1:
-#         last_sum = 1
-#     if last_difference < -1:
-#         last_difference = -1
-#     lower_retardance = np.arccos(last_sum)/(2*np.pi)
-#     upper_retardance = np.arccos(last_difference)/(2*np.pi)
-
-#     lower_retardance_error = retardance - lower_retardance
-#     #print(retardance, lower_retardance)
-#     upper_retardance_error = upper_retardance - retardance
-#     retardance_error = [lower_retardance_error, upper_retardance_error]
-#     return retardance_error
-
 # Calculate the retardance error by standard error propogation using RMS in the matrix elements from calibration
 def propagated_error(M_R, RMS):
     # return RMS/np.sqrt(1-(np.trace(M_R)/2-1)**2)
@@ -276,7 +240,7 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     parameter_bounds = ([-np.pi, -np.pi, -np.pi, -np.pi/2, -np.pi/2], [np.pi, np.pi, np.pi, np.pi/2, np.pi/2])
 
     # Find parameters from calibration 
-    normalized_QCal = QCal/(max(ICal))
+    normalized_QCal = QCal/(max(ICal)) # Why does this work better than QCal/ICal?
     popt, pcov = curve_fit(q_calibration_function, cal_angles, normalized_QCal, p0=initial_guess, bounds=parameter_bounds)
     print(popt, "Fit parameters for a1, w1, w2, r1, and r2. 1 for generator, 2 for analyzer")
 
@@ -292,9 +256,8 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
 
     np.set_printoptions(suppress=True) # Suppresses scientific notation, keeps decimal format
 
-    # Extract retardance from the last entry of the mueller matrix, which should just be cos(phi)
-    #retardance = np.arccos(MSample[3,3])/(2*np.pi)
-    r_decomposed_MSample = decompose_retarder(MSample)     # Use the polar decomposition of the retarder matrix and methods of Lu and Chiman 1996
+    # Use the polar decomposition of the retarder matrix and methods of Lu and Chiman 1996
+    r_decomposed_MSample = decompose_retarder(MSample)     
     retardance = np.arccos(np.trace(decompose_retarder(r_decomposed_MSample))/2 - 1)/(2*np.pi)
 
     Retardance_Error = propagated_error(r_decomposed_MSample, RMS_Error)
