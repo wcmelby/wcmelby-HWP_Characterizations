@@ -128,6 +128,7 @@ def condition_number(matrix):
     return norm*ninv
 
 
+# Function that makes the Mueller matrix using the calibration parameters a1, w1, w2, r2, and r2. Set these to 0 for an uncalibrated matrix
 def q_calibrated_full_mueller_polarimetry(thetas, a1, w1, w2, r1, r2, I_minus, I_plus, M_in=None):
     nmeas = len(thetas)  # Number of measurements
     Wmat1 = np.zeros([nmeas, 16])
@@ -139,6 +140,9 @@ def q_calibrated_full_mueller_polarimetry(thetas, a1, w1, w2, r1, r2, I_minus, I
     unnormalized_I_total = I_plus + I_minus
     Q = unnormalized_Q/np.max(unnormalized_I_total)
     I_total = unnormalized_I_total/np.max(unnormalized_I_total)
+
+    # Both Q and I should be normalized by the total INPUT flux, but we don't know this value. The closest we can guess is the maximum of the measured intensity
+    # This assumes the input flux is constant over time. Could be improved with a beam splitter that lets us monitor the input flux over time
 
     for i in range(nmeas):
         # Mueller Matrix of generator (linear polarizer and a quarter wave plate)
@@ -227,9 +231,9 @@ def RMS_calculator(calibration_matrix):
 
 # Calculate the retardance error by standard error propogation using RMS in the matrix elements from calibration
 def propagated_error(M_R, RMS):
-    # return RMS/np.sqrt(1-(np.trace(M_R)/2-1)**2)
+    # return RMS/np.sqrt(1-(np.trace(M_R)/2-1)**2) # These two equations are equivalent
     x = np.trace(M_R)
-    return 2*RMS/np.sqrt(4*x-x**2)
+    return 2*RMS/np.sqrt(4*x-x**2) # Value in radians
 
 
 # The function that gives everything you want to know at once
@@ -240,7 +244,7 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     parameter_bounds = ([-np.pi, -np.pi, -np.pi, -np.pi/2, -np.pi/2], [np.pi, np.pi, np.pi, np.pi/2, np.pi/2])
 
     # Find parameters from calibration 
-    normalized_QCal = QCal/(max(ICal)) # Why does this work better than QCal/ICal?
+    normalized_QCal = QCal/(max(ICal)) # This should be normalized by the input intensity, but we don't know that so use the max of the measured intensity instead as an approximation
     popt, pcov = curve_fit(q_calibration_function, cal_angles, normalized_QCal, p0=initial_guess, bounds=parameter_bounds)
     print(popt, "Fit parameters for a1, w1, w2, r1, and r2. 1 for generator, 2 for analyzer")
 
