@@ -1,3 +1,7 @@
+# These are the functions needed to run the traditional Dual Rotating Retarder Polarimeter measurements and analysis
+# This method uses measurements of intensity with a linear polarizer in the polarization state generator
+# One channel of a Wollaston prism can serve as a linear polarizer in this case
+
 import numpy as np
 from numpy.linalg import inv
 from astropy.io import fits
@@ -5,9 +9,6 @@ import os
 import re
 from scipy.optimize import curve_fit
 
-# These are the functions I will be using to run Dual Rotating Retarder Polarimeter measurements and analysis
-#test commit
-test = 1
 # Mueller matrix for a linear polarizer, with angle a between transmission axis and horizontal (radians)
 def linear_polarizer(a):
     M01 = np.cos(2*a)

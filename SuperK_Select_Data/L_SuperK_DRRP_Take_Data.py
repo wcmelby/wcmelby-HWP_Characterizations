@@ -1,18 +1,20 @@
-import FliSdk_V2 as sdk
+import FliSdk_V2 as sdk  # As of now only the lab desktop has the First Light SDK installed, so make sure to run on that computer. The camera is First Light CRED2 ER
 from astropy.io import fits
 import numpy as np
 import time
-from pylablib.devices import Thorlabs
+from pylablib.devices import Thorlabs  # Library for controlling the Thorlabs rotation stages (holding the quarter-wave plates)
 import copy
 import os
 
-# Double rotate and take image for DRRP method. Make sure the second motor rotates at 5x the rate of the first
-# This data saves to the L_Plate_Characterization, SuperK_Select folder in exoserver
-# This file also adds comments to the fits file header
-# I recommend rotating in 4 degree increments to ensure that enough data is taken
+# Script that rotates both quarter-wave plates and takes images for the DRRP method. 
+# Make sure the second motor rotates at 5x the rate of the first. I recommend rotating the first motor between 0-180 degrees in 4 degree increments.
+# This script reduces the images taken by subtracting a dark frame from each. Make sure the corresponding dark frame exists before taking this data. 
+# Data saves to the L_Plate_Characterization, SuperK_Select folder in exoserver.
+# The images are stored as fits files with comments for the camera conditions in the file header. 
 # Comments in all caps indicate parts that should be updated for each data set (wavelength, filename, folderpath)
 
-# Setting context
+
+# Setting camera context
 context = sdk.Init()
 
 print("Detection of grabbers...")
@@ -224,7 +226,7 @@ print("Raw images taken. Exiting SDK...")
 sdk.Exit(context)
 
 
-# Subtract dark frame from each of the raw images
+# Subtract dark frame from each of the raw images (this requires you to already have a dark image taken with the same camera settings)
 reduce = input("Subtract dark frame from images? (1 for yes, 0 for no)")
 reduce = float(reduce)
 if reduce == 1:

@@ -1,5 +1,5 @@
-# Note that this is the new version of DRRP_Functions.py that uses Q measurements instead of I and some additional features
-# Used to run Dual Rotating Retarder Polarimeter (DRRP) measurements and analysis
+# Functions used to run Dual Rotating Retarder Polarimeter (DRRP) measurements and analysis
+# This is the new version of DRRP_Functions.py that uses Q measurements instead of I, and some additional features
 
 import numpy as np
 from numpy.linalg import inv
@@ -204,6 +204,7 @@ def q_output_simulation_function(t, a1, w1, w2, r1, r2, M_in=None):
         prediction[i] = float(C @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
     return prediction
 
+
 # Function that is useful for generating intensity values for a given sample matrix and offset parameters
 def I_output_simulation_function(t, a1, w1, w2, r1, r2, M_in=None):
     if M_in is None:
@@ -239,7 +240,7 @@ def propagated_error(M_R, RMS):
 # The function that gives everything you want to know at once
 def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, sample_angles, sample_left_intensity, sample_right_intensity):
     ICal = cal_right_intensity + cal_left_intensity  # Plus should be the right spot, minus is the left spot
-    QCal = cal_right_intensity - cal_left_intensity # before changes
+    QCal = cal_right_intensity - cal_left_intensity 
     initial_guess = [0, 0, 0, 0, 0]
     parameter_bounds = ([-np.pi, -np.pi, -np.pi, -np.pi/2, -np.pi/2], [np.pi, np.pi, np.pi, np.pi/2, np.pi/2])
 
@@ -260,7 +261,7 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
 
     np.set_printoptions(suppress=True) # Suppresses scientific notation, keeps decimal format
 
-    # Use the polar decomposition of the retarder matrix and methods of Lu and Chiman 1996
+    # Use the polar decomposition of the retarder matrix (see below)
     r_decomposed_MSample = decompose_retarder(MSample)     
     retardance = np.arccos(np.trace(decompose_retarder(r_decomposed_MSample))/2 - 1)/(2*np.pi)
 

@@ -1,10 +1,11 @@
-import FliSdk_V2 as sdk
+import FliSdk_V2 as sdk  # make sure scripts that use the First Light SDK are run on on the lab desktop, not through remote SSH
 from astropy.io import fits
 import numpy as np
 import time
 import copy
 
-# New take image for DRRP method. This saves files pertaining to the L-plate to the Dark image folder
+# This takes and saves images to the L-plate Dark image folder
+# Take a dark image at the same camera conditions (fps, temp, tint) as the data, but with the camera lens cap on so no light gets in
 # This file also adds comments to the fits file header
 
 # Setting context
