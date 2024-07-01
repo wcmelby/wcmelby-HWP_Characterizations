@@ -3,12 +3,12 @@ This repository features the code needed to take images and analyze data for a D
 The data used here pertains to measurements of an L' band half-wave plate. 
 
 To construct our DRRP you will need at least:
-1x SuperK SELECT tunable filter laser light source (or similar)
-1x First Light CRED2 ER camera
-2x Thorlabs rotation stages
-1x linear polarizer
-2x achromatic quarter-wave plates
-1x Wollaston prism
+1x SuperK SELECT tunable filter laser light source (or similar)\\
+1x First Light CRED2 ER camera\\
+2x Thorlabs rotation stages\\
+1x linear polarizer\\
+2x achromatic quarter-wave plates\\
+1x Wollaston prism\\
 
 Important files to look at:
 L_SuperK_DRRP_Take_Data.py is the latest version of the data-taking script that controls the camera and rotation stages. 
