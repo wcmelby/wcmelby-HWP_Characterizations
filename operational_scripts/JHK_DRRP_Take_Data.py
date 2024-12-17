@@ -1,4 +1,4 @@
-import FliSdk_V2 as sdk  # As of now only the lab desktop has the First Light SDK installed, so make sure to run on that computer. The camera is First Light CRED2 ER
+import FliSdk_V2 as sdk  # As of now only Rayleigh has the First Light SDK installed. The camera is First Light CRED2 ER
 from astropy.io import fits
 import numpy as np
 import time
@@ -9,10 +9,12 @@ from NKTcontrols.controls import compact, select, driver, get_status
 
 # data taking script for DRRP, JHK plate
 # save data to the desktop for now until exoserver is reconnected
-# TODO: import laser controls
-# TODO: put all information in fits header
-# TODO: create folders automatically while saving data
+# TODO: put additional information in fits header
+# TODO: create folders automatically while saving data. Maybe only save the reduced data?
 # TODO: loop script through multiple wavelengths automatically
+# TODO: take images at multiple wavelengths before rotating
+# TODO: try connecting rotation stages through serial numbers
+# TODO: test if multiple stages can be moved simultaneously without interrupting
 
 # Script that rotates both quarter-wave plates and takes images for the DRRP method. 
 # Make sure the second motor rotates at 5x the rate of the first. I recommend rotating the first motor between 0-180 degrees in 4 degree increments.
@@ -161,7 +163,7 @@ sdk.Update(context)
 val = input("Take how many images?")
 val = int(val)
 
-# Now that the camera is setup, prepare for rotating while taking picrues
+# Now that the camera is set up, prepare for taking data
 # Most secure way is to ensure connection with the motor through the Kinesis app before running code
 
 stage1 = Thorlabs.KinesisMotor(Thorlabs.list_kinesis_devices()[0][0],scale='stage')
@@ -174,28 +176,39 @@ increment = input("Increment angle to change?")
 
 steps = int(tot_angle)/int(increment)
 
-for wavelength in wavelengths:
-    print("Homing devices...")
-    stage1.move_to(0)
+print("Homing devices...")
+stage1.move_to(0)
+stage1.wait_move()
+stage1._setup_homing()
+home1 = stage1.home(sync=True)
+
+stage2.move_to(0)
+stage2.wait_move()
+stage2._setup_homing()
+home2 = stage2.home(sync=True)
+print('Homing complete')
+
+
+for i in range(int(steps)+1):
+    # Move the quarter waveplates to the next position to take more images
+    angle = i * int(increment)
+    angle = int(angle)
+    # stage1.move_by(int(increment))
+    stage1.move_to(angle)
     stage1.wait_move()
-    stage1._setup_homing()
-    home1 = stage1.home(sync=True)
-
-    stage2.move_to(0)
+    # stage2.move_by(5*int(increment))
+    stage2.move_to(5*angle)
     stage2.wait_move()
-    stage2._setup_homing()
-    home2 = stage2.home(sync=True)
-    print('Homing complete')
-
     position1 = stage1.get_position()
     position2 = stage2.get_position()
-
     print('Current positions are ' + str(position1) + ' and ' + str(position2) + ' degrees')
+    # sdk.Stop(context)
 
-    driver1.set_channel(1, wavelength, channel_power) # set channel 1 to given wavelength at channel power
-    print(f"Starting data acquisition for wavelength: {wavelength} nm")
 
-    for i in range(int(steps)+1):
+    # for i in range(int(steps)+1):
+    for wavelength in wavelengths:
+        driver1.set_channel(1, wavelength, channel_power) # set channel 1 to given wavelength at channel power
+
         sdk.EnableGrabN(context, val+1)
         sdk.Update(context)
         sdk.Start(context)
@@ -228,9 +241,9 @@ for wavelength in wavelengths:
         
         frame_list = np.array(frame_list) 
         hdu_new = fits.PrimaryHDU(frame_list)
-        position1 = stage1.get_position()
-        position2 = stage2.get_position()
-        print('Position 1 is ' + str(position1) + ' and position 2 is ' + str(position2))
+        # position1 = stage1.get_position()
+        # position2 = stage2.get_position()
+        # print('Position 1 is ' + str(position1) + ' and position 2 is ' + str(position2))
         filename = f"DRRP_L_{wavelength}nm_"+str(val_fps)+"_"+str(set_tint)+"_"+str(position1)          # UPDATE FOR EACH WAVELENGTH
         hdu_new.writeto(foldername+ filename+".fits", overwrite = True)
 
@@ -243,28 +256,13 @@ for wavelength in wavelengths:
         hdu.close()
         print("Files saved to " + str(foldername))
 
-        # Move the half waveplates to the next position to take more images
-        stage1.move_by(int(increment))
-        stage1.wait_move()
-        stage2.move_by(5*int(increment))
-        stage2.wait_move()
-        sdk.Stop(context)
+
+print("Raw images taken. Exiting SDK...")
+sdk.Exit(context)
 
 
-    # print("Raw images taken. Exiting SDK...")
-    # sdk.Exit(context)
-
-
-    # Subtract dark frame from each of the raw images (this requires you to already have a dark image taken with the same camera settings)
-    # reduce = input("Subtract dark frame from images? (1 for yes, 0 for no)")
-    # reduce = float(reduce)
-    # if reduce == 1:
-    #     print("Subtracting dark frames")
-    # else:
-    #     quit()
-
-    print("Reducing images...")
-
+print("Reducing images...")
+for wavelength in wavelengths:
     # UPDATE THESE PARTS FOR EACH WAVELENGTH
     # dark_file = 'Z:\\Lab_Data\\Mueller_Matrix_Polarimeter\\L_Plate_Characterization\\Darks\\Dark_600_0.1.fits'
     dark_file = r"C:\\Users\\EPL User\\Desktop\\darks\\Dark_1600_0.1.fits" # REPLACE WITH THE CORRECT DARK FILE
@@ -307,4 +305,4 @@ for wavelength in wavelengths:
     print("Images have been reduced. Process finished.")
 
 
-sdk.Exit(context)
+# sdk.Exit(context)
