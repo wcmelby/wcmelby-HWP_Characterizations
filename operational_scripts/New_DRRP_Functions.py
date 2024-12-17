@@ -77,6 +77,18 @@ def dark_subtraction(image_file, dark_file, old_directory, new_directory):
 
 # Get intensity values from each spot in the reduced images. reduced_filename should just be the start of the name (leave out the last number, the angle). 
 def extract_intensities(reduced_filename, reduced_folder, lcenter, rcenter, maxradius, cutoff=5000):
+    """reduced_filename: a string indicating the first part of the file name that is the same for each file, like 'Reduced_DRRP_'.
+    reduced_folder: a string indicating the folder where these files are located. 
+    lcenter and rcenter: the coordinates [y, x] for the location of each beam on the detector. 
+    maxradius: an integer number of pixels to define as the radius of the beam.
+    Cutof: the value of the sum of pixels in the spot. 
+    If the measured value is less than this cutoff threshold, there is likely an error with that image and it will raise a warning.
+    
+    Outputs:
+    I_left and I_right: pixel sum of each spot, the intensity.
+    new_angles: the QWP angles with usable data. Angles where I<cutoff are excluded from this list.
+    bad_indices: list of the bad angles that were excluded. """
+
     I_left = np.array([])
     I_right = np.array([])
     bad_indices = np.array([])
@@ -90,8 +102,8 @@ def extract_intensities(reduced_filename, reduced_folder, lcenter, rcenter, maxr
                 lradius = np.sqrt((ys-lcenter[0])**2+(xs-lcenter[1])**2)
                 rradius = np.sqrt((ys-rcenter[0])**2+(xs-rcenter[1])**2)
 
-                lbackground_mask = (lradius > 20) & (lradius < 26)
-                rbackground_mask = (rradius > 20) & (rradius < 26)   # Index the background around each spot, take the median value
+                lbackground_mask = (lradius > maxradius+5) & (lradius < maxradius+10)
+                rbackground_mask = (rradius > maxradius+5) & (rradius < maxradius+10)   # Index the background around each spot, take the median value
 
                 background_lmedian = np.median(reduced_img_data[lbackground_mask])
                 background_rmedian = np.median(reduced_img_data[rbackground_mask])
@@ -239,6 +251,21 @@ def propagated_error(M_R, RMS):
 
 # The function that gives everything you want to know at once
 def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, sample_angles, sample_left_intensity, sample_right_intensity):
+    """Function that does polarimetric analysis. 
+    Calibration data is a measurement of air, sample data is a measurement of an optical sample. 
+    Inputs:
+    cal_angles: list of angles used in calibration.
+    cal_left_intensity and cal_right_intensity: list of intensity values for each spot at the given calibration angles. 
+    sample_angles: list of angles used for the sample.
+    sample_left_intensity and sample_right_intensity: list of intensity values for each spot at the given sample angles. 
+    
+    Outputs:
+    MSample: 4x4 Mueller matrix of the sample.
+    retardance: retardance of the sample in waves.
+    MCal: measured calibration matrix (should resemble a 4x4 identity matrix).
+    RMS_Error: root-mean-squared error of the calibration matrix.
+    Retardance_Error: error propagated to the retardance value."""
+    
     ICal = cal_right_intensity + cal_left_intensity  # Plus should be the right spot, minus is the left spot
     QCal = cal_right_intensity - cal_left_intensity 
     initial_guess = [0, 0, 0, 0, 0]
