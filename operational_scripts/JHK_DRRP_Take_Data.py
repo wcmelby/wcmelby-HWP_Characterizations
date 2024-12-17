@@ -15,6 +15,7 @@ from NKTcontrols.controls import compact, select, driver, get_status
 # TODO: take images at multiple wavelengths before rotating
 # TODO: try connecting rotation stages through serial numbers
 # TODO: test if multiple stages can be moved simultaneously without interrupting
+# TODO: find which laser power (and how focused the beam size should be) that works for all wavelengths
 
 # Script that rotates both quarter-wave plates and takes images for the DRRP method. 
 # Make sure the second motor rotates at 5x the rate of the first. I recommend rotating the first motor between 0-180 degrees in 4 degree increments.
