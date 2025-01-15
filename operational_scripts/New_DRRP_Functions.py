@@ -7,10 +7,10 @@ from astropy.io import fits
 import os
 import re
 from scipy.optimize import curve_fit
-import csv
-import random
-import matplotlib.pyplot as plt
-import textwrap
+# import csv
+# import random
+# import matplotlib.pyplot as plt
+# import textwrap
 
 # Mueller matrix for a linear polarizer, with angle a between transmission axis and horizontal (radians)
 def linear_polarizer(a):
