@@ -22,7 +22,7 @@ from NKTcontrols.controls import compact, select, driver, get_status
 # This script reduces the images taken by subtracting a dark frame from each. Make sure the corresponding dark frame exists before taking this data. 
 # The images are stored as fits files with comments for the camera conditions in the file header. 
 # Comments in all caps indicate parts that should be updated for each data set (wavelength, filename, folderpath)
-
+ # test commit
 compact1 = compact()
 select1 = select()
 driver1 = driver()
