@@ -251,7 +251,8 @@ def propagated_error(M_R, RMS):
 
 # The function that gives everything you want to know at once
 def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, sample_angles, sample_left_intensity, sample_right_intensity):
-    """Function that does polarimetric analysis. 
+    """
+    Function that does polarimetric analysis. 
     Calibration data is a measurement of air, sample data is a measurement of an optical sample. 
     Inputs:
     cal_angles: list of angles used in calibration.
@@ -264,7 +265,8 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     retardance: retardance of the sample in waves.
     MCal: measured calibration matrix (should resemble a 4x4 identity matrix).
     RMS_Error: root-mean-squared error of the calibration matrix.
-    Retardance_Error: error propagated to the retardance value."""
+    Retardance_Error: error propagated to the retardance value.
+    """
     
     ICal = cal_right_intensity + cal_left_intensity  # Plus should be the right spot, minus is the left spot
     QCal = cal_right_intensity - cal_left_intensity 
@@ -274,7 +276,7 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     # Find parameters from calibration 
     normalized_QCal = QCal/(max(ICal)) # This should be normalized by the input intensity, but we don't know that so use the max of the measured intensity instead as an approximation
     popt, pcov = curve_fit(q_calibration_function, cal_angles, normalized_QCal, p0=initial_guess, bounds=parameter_bounds)
-    print(popt, "Fit parameters for a1, w1, w2, r1, and r2. 1 for generator, 2 for analyzer")
+    # print(popt, "Fit parameters for a1, w1, w2, r1, and r2. 1 for generator, 2 for analyzer")
 
     # The calibration matrix (should be close to identity) to see how well the parameters compensate
     MCal = q_calibrated_full_mueller_polarimetry(cal_angles, popt[0], popt[1], popt[2], popt[3], popt[4], cal_left_intensity, cal_right_intensity)
@@ -294,7 +296,7 @@ def q_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
 
     Retardance_Error = propagated_error(r_decomposed_MSample, RMS_Error)
     
-    return MSample, retardance, MCal, RMS_Error, Retardance_Error 
+    return MSample, retardance, MCal, RMS_Error, Retardance_Error, popt
 
 
 
