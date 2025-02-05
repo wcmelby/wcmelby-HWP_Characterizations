@@ -424,3 +424,109 @@ def decompose_retarder(M, return_all=False):
     else:
         return Mr
     
+
+
+# imports from Old DRRP_Functions, specializing in I reduction (and averaging over the two beams)
+
+def I_calibrated_full_mueller_polarimetry(thetas, a1, a2, w1, w2, r1, r2, I_meas=1, LPA_angle=0, return_condition_number=False, M_in=None):
+    """
+    Function that takes measurements and calibration parameters to construct a Mueller matrix using I reduction.
+    """
+    
+    nmeas = len(thetas)
+    Wmat = np.zeros([nmeas, 16])
+    Pmat = np.zeros([nmeas])
+    th = thetas
+
+    for i in range(nmeas):
+        # Mueller Matrix of generator (linear polarizer and a quarter wave plate)
+        Mg = linear_retarder(th[i]+w1, np.pi/2+r1) @ linear_polarizer(0+a1)
+
+        # Mueller Matrix of analyzer (one channel of the Wollaston prism is treated as a linear polarizer. The right spot is horizontal (0) and the left spot is vertical(pi/2))
+        Ma = linear_polarizer(LPA_angle+a2) @ linear_retarder(th[i]*5+w2, np.pi/2+r2)
+
+        # Data reduction matrix. Taking the 0 index ensures that intensity is the output
+        Wmat[i,:] = np.kron(Ma[0,:], Mg[:,0])
+
+        # M_in is some example Mueller matrix. Providing this input will test theoretical Mueller matrix. Otherwise, the raw data is used
+        if M_in is not None:
+            Pmat[i] = (Ma[0,:] @ M_in @ Mg[:,0]) * I_meas
+        else:
+            Pmat[i] = I_meas[i]
+
+    # Compute Mueller matrix using Moore-Penrose pseudo invervse
+    M = np.linalg.pinv(Wmat) @ Pmat
+    M = np.reshape(M,[4,4])
+
+    if return_condition_number == True:
+        return M, condition_number(Wmat)
+    else:
+        return M
+    
+
+def I_horizontal_calibration_function(t, a1, a2, w1, w2, r1, r2):
+    """
+    Function to simulate the intensity output of the horizontal channel. Used for curve fitting the calibration parameters.
+    """
+
+    prediction = [None]*len(t)
+    for i in range(len(t)):
+        prediction[i] = float(A @ linear_polarizer(a2) @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
+    return prediction
+
+
+def I_vertical_calibration_function(t, a1, a2, w1, w2, r1, r2):
+    """
+    Function to simulate the intensity output of the vertical channel. Used for curve fitting the calibration parameters.
+    """
+
+    prediction = [None]*len(t)
+    for i in range(len(t)):
+        prediction[i] = float(A @ linear_polarizer(a2+np.pi/2) @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
+    return prediction
+
+
+def I_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, sample_angles, sample_left_intensity, sample_right_intensity):
+    """
+    Function to take input measurements and construct mueller matrices for the left and right beams using I reduction.
+    """
+
+    initial_guess = [0, 0, 0, 0, 0, 0]
+    parameter_bounds = ([-np.pi, -np.pi, -np.pi, -np.pi, -np.pi/2, -np.pi/2], [np.pi, np.pi, np.pi, np.pi, np.pi/2, np.pi/2])
+
+    # Find parameters from calibration of the left spot
+    lnormalized_intensity = cal_left_intensity/(2*max(cal_left_intensity))
+    lpopt, lpcov = curve_fit(I_vertical_calibration_function, cal_angles, lnormalized_intensity, p0=initial_guess, bounds=parameter_bounds)
+    print(lpopt, "Left parameters for a1, a2, w1, w2, r1, and r2. 1 for generator, 2 for analyzer")
+    #print(np.sqrt(np.diag(lpcov)))
+
+    # Find parameters from calibration of the right spot
+    rnormalized_intensity = cal_right_intensity/(2*max(cal_right_intensity))
+    rpopt, rpcov = curve_fit(I_horizontal_calibration_function, cal_angles, rnormalized_intensity, p0=initial_guess, bounds=parameter_bounds)
+    print(rpopt, "Right parameters for a1, a2, w1, w2, r1, and r2. 1 for generator, 2 for analyzer")
+    #print(np.sqrt(np.diag(rpcov)))
+
+    # Optional print the calibration matrices (should be close to identity) to see how well the parameters compensate
+    MlCal = I_calibrated_full_mueller_polarimetry(cal_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5], cal_left_intensity, LPA_angle=np.pi/2)
+    print(MlCal/MlCal.max(), ' Left calibration')
+    MrCal = I_calibrated_full_mueller_polarimetry(cal_angles, rpopt[0], rpopt[1], rpopt[2], rpopt[3], rpopt[4], rpopt[5], cal_right_intensity)
+    print(MrCal/MrCal.max(), ' Right calibration')
+
+    # Use the parameters found above from curve fitting to construct the actual Mueller matrix of the sample for left and right beams (Ml and Mr)
+    Ml = I_calibrated_full_mueller_polarimetry(sample_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5], sample_left_intensity, LPA_angle=np.pi/2)
+    Ml = Ml/np.max(np.abs(Ml))
+
+    Mr = I_calibrated_full_mueller_polarimetry(sample_angles, rpopt[0], rpopt[1], rpopt[2], rpopt[3], rpopt[4], rpopt[5], sample_right_intensity)
+    Mr = Mr/np.max(np.abs(Mr))
+
+    np.set_printoptions(suppress=True)
+
+    # Extract retardance from the last entry of the mueller matrix, which should just be cos(phi)
+    lretardance = np.arccos(Ml[3,3])/(2*np.pi)
+    rretardance = np.arccos(Mr[3,3])/(2*np.pi)
+    print(lretardance, ' This is the retardance found from the left spot')
+    print(rretardance, ' This is the retardance found from the right spot')
+
+    avg_retardance = (lretardance+rretardance)/2
+
+    return Ml, Mr, avg_retardance
