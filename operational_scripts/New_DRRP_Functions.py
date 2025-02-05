@@ -902,28 +902,31 @@ def I_vertical_calibration_function(t, a1, a2, w1, w2, r1, r2):
 def I_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, sample_angles, sample_left_intensity, sample_right_intensity):
     """
     Function to take input measurements and construct mueller matrices for the left and right beams using I reduction.
+    popt gives best fit parameters for a1, a2, w1, w2, r1, and r2. 1 for generator, 2 for analyzer components. 
     """
 
     initial_guess = [0, 0, 0, 0, 0, 0]
     parameter_bounds = ([-np.pi, -np.pi, -np.pi, -np.pi, -np.pi/2, -np.pi/2], [np.pi, np.pi, np.pi, np.pi, np.pi/2, np.pi/2])
 
     # Find parameters from calibration of the left spot
-    lnormalized_intensity = cal_left_intensity/(2*max(cal_left_intensity))
+    lnormalized_intensity = cal_left_intensity/(2*max(cal_left_intensity)) # original
+    # lnormalized_intensity = cal_left_intensity/(max(cal_left_intensity))
     lpopt, lpcov = curve_fit(I_vertical_calibration_function, cal_angles, lnormalized_intensity, p0=initial_guess, bounds=parameter_bounds)
-    print(lpopt, "Left parameters for a1, a2, w1, w2, r1, and r2. 1 for generator, 2 for analyzer")
-    #print(np.sqrt(np.diag(lpcov)))
 
     # Find parameters from calibration of the right spot
-    rnormalized_intensity = cal_right_intensity/(2*max(cal_right_intensity))
+    rnormalized_intensity = cal_right_intensity/(2*max(cal_right_intensity)) # original
+    # rnormalized_intensity = cal_right_intensity/(max(cal_right_intensity)) # does it need to be divided by twice the max?
     rpopt, rpcov = curve_fit(I_horizontal_calibration_function, cal_angles, rnormalized_intensity, p0=initial_guess, bounds=parameter_bounds)
-    print(rpopt, "Right parameters for a1, a2, w1, w2, r1, and r2. 1 for generator, 2 for analyzer")
-    #print(np.sqrt(np.diag(rpcov)))
 
     # Optional print the calibration matrices (should be close to identity) to see how well the parameters compensate
     MlCal = I_calibrated_full_mueller_polarimetry(cal_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5], cal_left_intensity, LPA_angle=np.pi/2)
-    print(MlCal/MlCal.max(), ' Left calibration')
+    MlCal = MlCal/np.max(np.abs(MlCal))
     MrCal = I_calibrated_full_mueller_polarimetry(cal_angles, rpopt[0], rpopt[1], rpopt[2], rpopt[3], rpopt[4], rpopt[5], cal_right_intensity)
-    print(MrCal/MrCal.max(), ' Right calibration')
+    MrCal = MrCal/np.max(np.abs(MrCal))
+
+    # Calculate RMS error of each calibration matrix
+    lRMS_Error = RMS_calculator(MlCal)
+    rRMS_Error = RMS_calculator(MrCal)
 
     # Use the parameters found above from curve fitting to construct the actual Mueller matrix of the sample for left and right beams (Ml and Mr)
     Ml = I_calibrated_full_mueller_polarimetry(sample_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5], sample_left_intensity, LPA_angle=np.pi/2)
@@ -934,12 +937,21 @@ def I_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
 
     np.set_printoptions(suppress=True)
 
+    # Use the polar decomposition of the retarder matrix 
+    l_retarder_decomposed_MSample = decompose_retarder(Ml, normalize=True)
+    r_retarder_decomposed_MSample = decompose_retarder(Mr, normalize=True)
+
+    # retardance = np.arccos(np.trace(normalized_decompose_retarder(r_decomposed_MSample))/2 - 1)/(2*np.pi) # Value in waves
+    lretardance = np.arccos(np.trace(r_retarder_decomposed_MSample)/2 - 1)/(2*np.pi) # Value in waves
+    rretardance = np.arccos(np.trace(r_retarder_decomposed_MSample)/2 - 1)/(2*np.pi)
+
+    lRetardance_Error = propagated_error(l_retarder_decomposed_MSample, lRMS_Error)
+    rRetardance_Error = propagated_error(r_retarder_decomposed_MSample, rRMS_Error)
+
     # Extract retardance from the last entry of the mueller matrix, which should just be cos(phi)
-    lretardance = np.arccos(Ml[3,3])/(2*np.pi)
-    rretardance = np.arccos(Mr[3,3])/(2*np.pi)
-    print(lretardance, ' This is the retardance found from the left spot')
-    print(rretardance, ' This is the retardance found from the right spot')
+    # lretardance = np.arccos(Ml[3,3])/(2*np.pi)
+    # rretardance = np.arccos(Mr[3,3])/(2*np.pi)
 
-    avg_retardance = (lretardance+rretardance)/2
+    # avg_retardance = (lretardance+rretardance)/2
 
-    return Ml, Mr, avg_retardance
+    return Ml, Mr, lretardance, rretardance, lRetardance_Error, rRetardance_Error, MlCal, MrCal, lpopt, rpopt
