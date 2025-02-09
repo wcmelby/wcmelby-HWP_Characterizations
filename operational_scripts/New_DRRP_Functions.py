@@ -705,7 +705,7 @@ def q_output_simulation_function(t, a1, w1, w2, r1, r2, M_in=None):
 
 
 # Function that is useful for generating intensity values for a given sample matrix and offset parameters
-def I_output_simulation_function(t, a1, w1, w2, r1, r2, M_in=None):
+def I_total_output_simulation_function(t, a1, w1, w2, r1, r2, M_in=None):
     """Function to generate TOTAL intensity values measured with a given Mueller matrix and offset parameters.
     Parameters
     ----------
@@ -740,7 +740,8 @@ def I_output_simulation_function(t, a1, w1, w2, r1, r2, M_in=None):
 
 # Basically the same as above, but with an optional input matrix to simulate data
 def single_output_simulation_function(t, a1, a2, w1, w2, r1, r2, LPA_angle=0, M_in=None):
-    """Function to generate intensity values for one polarization at a time. Default is horizontal, with LPA=0. For vertical, set LPA=pi/2.
+    """
+    Function to generate intensity values for one polarization at a time. Default is horizontal, with LPA=0. For vertical, set LPA=pi/2.
     Parameters
     ----------
     t : array
@@ -777,7 +778,8 @@ def single_output_simulation_function(t, a1, a2, w1, w2, r1, r2, LPA_angle=0, M_
 
 
 def q_ultimate_polarimetry(cal_angles, cal_vert_intensity, cal_hor_intensity, sample_angles, sample_vert_intensity, sample_hor_intensity):
-    """Function that calculates the Mueller matrix of a sample and other relevant information.
+    """
+    Function that calculates the Mueller matrix of a sample and other relevant information.
     cal_angles and sample_angles could be the same, or could be different.
     Parameters
     ----------
@@ -877,30 +879,147 @@ def I_calibrated_full_mueller_polarimetry(thetas, a1, a2, w1, w2, r1, r2, I_meas
         return M
     
 
-def I_horizontal_calibration_function(t, a1, a2, w1, w2, r1, r2):
-    """
-    Function to simulate the intensity output of the horizontal channel. Used for curve fitting the calibration parameters.
-    """
+# def I_horizontal_calibration_function(t, a1, a2, w1, w2, r1, r2):
+#     """
+#     Function to simulate the intensity output of the horizontal channel. Used for curve fitting the calibration parameters.
+#     """
 
-    prediction = [None]*len(t)
-    for i in range(len(t)):
-        prediction[i] = float(A @ linear_polarizer(a2) @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
-    return prediction
+#     prediction = [None]*len(t)
+#     for i in range(len(t)):
+#         prediction[i] = float(A @ linear_polarizer(a2) @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
+#     return prediction
 
+
+# def I_vertical_calibration_function(t, a1, a2, w1, w2, r1, r2):
+#     """
+#     Function to simulate the intensity output of the vertical channel. Used for curve fitting the calibration parameters.
+#     """
+
+#     prediction = [None]*len(t)
+#     for i in range(len(t)):
+#         prediction[i] = float(A @ linear_polarizer(a2+np.pi/2) @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
+#     return prediction
 
 def I_vertical_calibration_function(t, a1, a2, w1, w2, r1, r2):
     """
-    Function to simulate the intensity output of the vertical channel. Used for curve fitting the calibration parameters.
+    Simulate the horizontal channel intensity.
+    
+    Parameters:
+      xdata : tuple
+          A tuple containing (t, I_meas), where
+              t      : array of angles
+              I_total_meas : array of measured intensities, summing both vertical and horizontal channels. Should have the same length as t.
+      a1, a2, w1, w2, r1, r2 : float
+          Calibration parameters.
+    
+    Returns:
+      Array of predicted output intensities. Values range from 0 to 0.5 (at most 1/2 the input intensity, because the first element is a linear polarizer)
     """
 
-    prediction = [None]*len(t)
+    # Preallocate an array for predictions.
+    prediction = np.empty_like(t, dtype=float)
+    
     for i in range(len(t)):
-        prediction[i] = float(A @ linear_polarizer(a2+np.pi/2) @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
+        # Assume linear_polarizer and linear_retarder are defined elsewhere.
+        prediction[i] = float(
+            A @ linear_polarizer(a2+np.pi/2) @ linear_retarder(5 * t[i] + w2, np.pi/2 + r2) @ 
+            M_identity @ linear_retarder(t[i] + w1, np.pi/2 + r1) @ linear_polarizer(a1) @ B 
+        )
+    
+    # Multiply the simulated intensity with the measured input intensity at each angle.
     return prediction
+
+
+def I_horizontal_calibration_function(t, a1, a2, w1, w2, r1, r2):
+    """
+    Simulate the horizontal channel intensity.
+    
+    Parameters:
+      xdata : tuple
+          A tuple containing (t, I_meas), where
+              t      : array of angles
+              I_total_meas : array of measured intensities, summing both vertical and horizontal channels. Should have the same length as t.
+      a1, a2, w1, w2, r1, r2 : float
+          Calibration parameters.
+    
+    Returns:
+      Array of predicted output intensities. Values range from 0 to 0.5 (at most 1/2 the input intensity, because the first element is a linear polarizer)
+    """
+    
+    # Preallocate an array for predictions.
+    prediction = np.empty_like(t, dtype=float)
+    
+    for i in range(len(t)):
+        # Assume linear_polarizer and linear_retarder are defined elsewhere.
+        prediction[i] = float(
+            A @ linear_polarizer(a2) @ linear_retarder(5 * t[i] + w2, np.pi/2 + r2) @ 
+            M_identity @ linear_retarder(t[i] + w1, np.pi/2 + r1) @ linear_polarizer(a1) @ B 
+        )
+    
+    # Multiply the simulated intensity with the measured input intensity at each angle.
+    return prediction
+
+
+# def I_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, sample_angles, sample_left_intensity, sample_right_intensity):
+#     """
+#     Function to take input measurements and construct mueller matrices for the left and right beams using I reduction.
+#     popt gives best fit parameters for a1, a2, w1, w2, r1, and r2. 1 for generator, 2 for analyzer components. 
+#     """
+
+#     initial_guess = [0, 0, 0, 0, 0, 0]
+#     parameter_bounds = ([-np.pi, -np.pi, -np.pi, -np.pi, -np.pi/2, -np.pi/2], [np.pi, np.pi, np.pi, np.pi, np.pi/2, np.pi/2])
+
+#     # Find parameters from calibration of the left spot
+#     lnormalized_intensity = cal_left_intensity/(2*max(cal_left_intensity)) # original. Divide by twice the max value to estimate the overall input intensity (split between the two channels)
+#     lpopt, lpcov = curve_fit(I_vertical_calibration_function, cal_angles, lnormalized_intensity, p0=initial_guess, bounds=parameter_bounds)
+
+#     # Find parameters from calibration of the right spot
+#     rnormalized_intensity = cal_right_intensity/(2*max(cal_right_intensity)) # original. 
+#     rpopt, rpcov = curve_fit(I_horizontal_calibration_function, cal_angles, rnormalized_intensity, p0=initial_guess, bounds=parameter_bounds)
+
+#     # Optional print the calibration matrices (should be close to identity) to see how well the parameters compensate
+#     MlCal = I_calibrated_full_mueller_polarimetry(cal_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5], cal_left_intensity, LPA_angle=np.pi/2)
+#     MlCal = MlCal/np.max(np.abs(MlCal))
+#     MrCal = I_calibrated_full_mueller_polarimetry(cal_angles, rpopt[0], rpopt[1], rpopt[2], rpopt[3], rpopt[4], rpopt[5], cal_right_intensity)
+#     MrCal = MrCal/np.max(np.abs(MrCal))
+
+#     # Calculate RMS error of each calibration matrix
+#     lRMS_Error = RMS_calculator(MlCal)
+#     rRMS_Error = RMS_calculator(MrCal)
+
+#     # Use the parameters found above from curve fitting to construct the actual Mueller matrix of the sample for left and right beams (Ml and Mr)
+#     Ml = I_calibrated_full_mueller_polarimetry(sample_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5], sample_left_intensity, LPA_angle=np.pi/2)
+#     Ml = Ml/np.max(np.abs(Ml))
+
+#     Mr = I_calibrated_full_mueller_polarimetry(sample_angles, rpopt[0], rpopt[1], rpopt[2], rpopt[3], rpopt[4], rpopt[5], sample_right_intensity)
+#     Mr = Mr/np.max(np.abs(Mr))
+
+#     np.set_printoptions(suppress=True)
+
+#     # Use the polar decomposition of the retarder matrix 
+#     l_retarder_decomposed_MSample = decompose_retarder(Ml, normalize=True)
+#     r_retarder_decomposed_MSample = decompose_retarder(Mr, normalize=True)
+
+#     # retardance = np.arccos(np.trace(normalized_decompose_retarder(r_decomposed_MSample))/2 - 1)/(2*np.pi) # Value in waves
+#     lretardance = np.arccos(np.trace(r_retarder_decomposed_MSample)/2 - 1)/(2*np.pi) # Value in waves
+#     rretardance = np.arccos(np.trace(r_retarder_decomposed_MSample)/2 - 1)/(2*np.pi)
+
+#     lRetardance_Error = propagated_error(l_retarder_decomposed_MSample, lRMS_Error)
+#     rRetardance_Error = propagated_error(r_retarder_decomposed_MSample, rRMS_Error)
+
+#     # Extract retardance from the last entry of the mueller matrix, which should just be cos(phi)
+#     # lretardance = np.arccos(Ml[3,3])/(2*np.pi)
+#     # rretardance = np.arccos(Mr[3,3])/(2*np.pi)
+
+#     # avg_retardance = (lretardance+rretardance)/2
+
+#     return Ml, Mr, lretardance, rretardance, lRetardance_Error, rRetardance_Error, MlCal, MrCal, lpopt, rpopt
 
 
 def I_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, sample_angles, sample_left_intensity, sample_right_intensity):
     """
+    New version!!! Now the calibration function takes intensity values that are normalized by the total intensity at each angle.
+    
     Function to take input measurements and construct mueller matrices for the left and right beams using I reduction.
     popt gives best fit parameters for a1, a2, w1, w2, r1, and r2. 1 for generator, 2 for analyzer components. 
     """
@@ -908,18 +1027,26 @@ def I_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     initial_guess = [0, 0, 0, 0, 0, 0]
     parameter_bounds = ([-np.pi, -np.pi, -np.pi, -np.pi, -np.pi/2, -np.pi/2], [np.pi, np.pi, np.pi, np.pi, np.pi/2, np.pi/2])
 
+    Cal_I_total_meas = cal_left_intensity + cal_right_intensity
+    lnormalized_intensity = cal_left_intensity/(2*Cal_I_total_meas) # normalize values from 0 to 0.5 to match the output of the simulation function
+    rnormalized_intensity = cal_right_intensity/(2*Cal_I_total_meas)
+
     # Find parameters from calibration of the left spot
-    lnormalized_intensity = cal_left_intensity/(2*max(cal_left_intensity)) # original
-    # lnormalized_intensity = cal_left_intensity/(max(cal_left_intensity))
     lpopt, lpcov = curve_fit(I_vertical_calibration_function, cal_angles, lnormalized_intensity, p0=initial_guess, bounds=parameter_bounds)
 
+    # plt.plot(cal_angles, lnormalized_intensity, label='l measured (normalized)', marker='o')
+    # plt.plot(cal_angles, I_vertical_calibration_function(cal_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5]), label='l predicted', marker='o')
+    # plt.legend()
+
     # Find parameters from calibration of the right spot
-    rnormalized_intensity = cal_right_intensity/(2*max(cal_right_intensity)) # original
-    # rnormalized_intensity = cal_right_intensity/(max(cal_right_intensity)) # does it need to be divided by twice the max?
     rpopt, rpcov = curve_fit(I_horizontal_calibration_function, cal_angles, rnormalized_intensity, p0=initial_guess, bounds=parameter_bounds)
 
+    # plt.plot(cal_angles, rnormalized_intensity, label='r measured (normalized)', marker='o')
+    # plt.plot(cal_angles, I_horizontal_calibration_function(cal_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5]), label='r predicted', marker='o')
+    # plt.legend()
+
     # Optional print the calibration matrices (should be close to identity) to see how well the parameters compensate
-    MlCal = I_calibrated_full_mueller_polarimetry(cal_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5], cal_left_intensity, LPA_angle=np.pi/2)
+    MlCal = I_calibrated_full_mueller_polarimetry(cal_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5], cal_left_intensity, LPA_angle=np.pi/2) # intensities don't need to be normalized here
     MlCal = MlCal/np.max(np.abs(MlCal))
     MrCal = I_calibrated_full_mueller_polarimetry(cal_angles, rpopt[0], rpopt[1], rpopt[2], rpopt[3], rpopt[4], rpopt[5], cal_right_intensity)
     MrCal = MrCal/np.max(np.abs(MrCal))
@@ -929,7 +1056,7 @@ def I_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     rRMS_Error = RMS_calculator(MrCal)
 
     # Use the parameters found above from curve fitting to construct the actual Mueller matrix of the sample for left and right beams (Ml and Mr)
-    Ml = I_calibrated_full_mueller_polarimetry(sample_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5], sample_left_intensity, LPA_angle=np.pi/2)
+    Ml = I_calibrated_full_mueller_polarimetry(sample_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5], sample_left_intensity, LPA_angle=np.pi/2) # intensities don't need to be normalized
     Ml = Ml/np.max(np.abs(Ml))
 
     Mr = I_calibrated_full_mueller_polarimetry(sample_angles, rpopt[0], rpopt[1], rpopt[2], rpopt[3], rpopt[4], rpopt[5], sample_right_intensity)
@@ -954,4 +1081,4 @@ def I_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
 
     # avg_retardance = (lretardance+rretardance)/2
 
-    return Ml, Mr, lretardance, rretardance, lRetardance_Error, rRetardance_Error, MlCal, MrCal, lpopt, rpopt
+    return Ml, Mr, lretardance, rretardance, lRetardance_Error, rRetardance_Error, MlCal, MrCal, lRMS_Error, rRMS_Error, lpopt, rpopt
