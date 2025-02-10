@@ -154,7 +154,8 @@ print("Is grab finished? " + str(sdk.IsGrabNFinished(context)))
 
 frame_list = []
 # Choose file-saving directory
-foldername = r"Z:\\Lab_Data\\Mueller_Matrix_Polarimeter\\L_Plate_Characterization\\Darks\\"
+# foldername = r"Z:\\Lab_Data\\Mueller_Matrix_Polarimeter\\L_Plate_Characterization\\Darks\\"
+foldername = "D:\\desktop_drrp_data\\test_12_17_2024\\darks\\"
 for i in range(val+1):
     image16b = copy.deepcopy(sdk.GetRawImageAsNumpyArray(context, i))
 
@@ -166,12 +167,13 @@ frame_list = np.array(frame_list)
 
 # Save and name the files 
 hdu_new = fits.PrimaryHDU(frame_list)
-filename = "Dark_"+str(val_fps)+"_"+str(set_tint)
+# filename = "Dark_"+str(val_fps)+"_"+str(set_tint)
+filename = str(set_temp)+"C_tint_"+str(set_tint)+"_FPS_"+str(val_fps)
 hdu_new.writeto(foldername+filename+".fits", overwrite = True)
 
 hdu = fits.open(foldername+filename+'.fits', mode='update')
 header = hdu[0].header
-header['COMMENT1'] = "Dark image taken using CRED2 ER camera with cap off and light source off."
+header['COMMENT1'] = "Dark image taken using CRED2 ER camera with cap on."
 header['COMMENT2'] = "Camera temperature: "+str(set_temp)+"C. Framerate: "+str(val_fps)+"fps. Exposure time: "+str(set_tint)+"ms."
 hdu.flush()
 hdu.close()
