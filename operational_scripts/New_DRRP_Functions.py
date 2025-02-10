@@ -303,7 +303,21 @@ def q_calibration_function(t, a1, w1, w2, r1, r2):
 
 # Calculate the root-mean-square error of the calibration matrix by comparing with the identity matrix
 def RMS_calculator(calibration_matrix):
+    """Calculates the root-mean-square error of a calibration matrix by comparing with the identity matrix.
+
+    Parameters
+    ----------
+    calibration_matrix : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    M_identity = np.eye(4) # 4x4 identity matrix
     differences = []
+
     for i in range(0, 4):
         for j in range(0, 4):
             differences.append(calibration_matrix[i, j]-M_identity[i, j])
@@ -315,6 +329,18 @@ def RMS_calculator(calibration_matrix):
 
 # Calculate the retardance error by standard error propogation using RMS in the matrix elements from calibration
 def propagated_error(M_R, RMS):
+    """Propagates error in the Mueller matrix to error in the retardance. 
+
+    Parameters
+    ----------
+    M_R : 4x4 array for the Mueller matrix of a retarder
+    RMS : float. Root-mean-square error of the calibration matrix
+
+    Returns
+    -------
+    float
+        RMS error in the retardance value. 
+    """
     # return RMS/np.sqrt(1-(np.trace(M_R)/2-1)**2) # These two equations are equivalent
     x = np.trace(M_R)
     return 2*RMS/np.sqrt(4*x-x**2) # Value in radians
@@ -1069,8 +1095,13 @@ def I_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     r_retarder_decomposed_MSample = decompose_retarder(Mr, normalize=True)
 
     # retardance = np.arccos(np.trace(normalized_decompose_retarder(r_decomposed_MSample))/2 - 1)/(2*np.pi) # Value in waves
-    lretardance = np.arccos(np.trace(r_retarder_decomposed_MSample)/2 - 1)/(2*np.pi) # Value in waves
-    rretardance = np.arccos(np.trace(r_retarder_decomposed_MSample)/2 - 1)/(2*np.pi)
+    ltrace_argument = np.trace(l_retarder_decomposed_MSample)/2 - 1
+    ltrace_argument = np.clip(ltrace_argument, -1, 1) # prevent nan outputs by limiting values to the domain of arccos
+    rtrace_argument = np.trace(r_retarder_decomposed_MSample)/2 - 1
+    rtrace_argument = np.clip(rtrace_argument, -1, 1)
+
+    lretardance = np.arccos(ltrace_argument)/(2*np.pi) # Value in waves
+    rretardance = np.arccos(rtrace_argument)/(2*np.pi)
 
     lRetardance_Error = propagated_error(l_retarder_decomposed_MSample, lRMS_Error)
     rRetardance_Error = propagated_error(r_retarder_decomposed_MSample, rRMS_Error)
