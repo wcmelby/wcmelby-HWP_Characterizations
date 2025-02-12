@@ -7,6 +7,7 @@ from astropy.io import fits
 import os
 import re
 from scipy.optimize import curve_fit
+import glob
 # import csv
 # import random
 # import matplotlib.pyplot as plt
@@ -75,9 +76,97 @@ def dark_subtraction(image_file, dark_file, old_directory, new_directory):
             fits.writeto(new_filepath, reduced_data, overwrite=True)
 
 
+def dark_subtract(wavelengths, dark_file_path, foldername_base):
+    """
+    Function to perform dark subtraction of fits file images. Saves the reduced images to a new folder. Can be performed over multiple wavelengths at once!
+    
+    Parameters:
+    wavelengths: Enter wavelengths like [1100, 1850] in nm.
+    dark_file_path: Path to the desired dark image file. 
+    foldername_base: Path to the base folder where other folders for raw and reduced (dark subtracted) images are stored.
+    
+    Returns:
+    None
+
+    """
+    
+    print("Reducing images...")
+    for idx, wavelength in enumerate(wavelengths):
+        try:
+            foldername = os.path.join(foldername_base, f"Cal_{wavelength}_Raw\\")
+            new_directory = os.path.join(foldername_base, f"Cal_{wavelength}_Reduced\\")
+            os.makedirs(new_directory, exist_ok=True)
+
+            # Clear out old files in the directory
+            old_files = glob.glob(os.path.join(new_directory, '*'))
+            for f in old_files:
+                os.remove(f)
+
+            # Open the dark image
+            dark = fits.getdata(dark_file_path)
+            dark_median = np.median(dark, axis=0)
+
+            # Search through raw data folder
+            for file in os.listdir(foldername):
+                if file.startswith("DRRP_"):
+                    with fits.open(os.path.join(foldername, file)) as hdul:
+                        img_data = hdul[0].data
+                        reduced_data = img_data - dark_median
+                        hdul.close() # see if this makes it faster
+
+                    # Save the reduced image
+                    new_filename = f"Reduced_{file}"
+                    fits.writeto(os.path.join(new_directory, new_filename), reduced_data, overwrite=True)
+
+                    # Add comments to reduced image header
+                    with fits.open(os.path.join(new_directory, new_filename), mode='update') as hdu:
+                        header = hdu[0].header
+                        header['COMMENT1'] = "Reduced image taken using CRED2 ER performing DRRP measurements."
+                        # header['COMMENT2'] = f"Camera temperature: {cam.set_temp}C. Framerate: {cam.fps}fps. Exposure time: {cam.tint}ms."
+                        hdu.flush()
+
+            print(f"Images have been reduced for wavelength {wavelength}. Process finished.")
+        except Exception as e:
+            print(f"Error during reduction for wavelength {wavelength}: {e}")
+
+
+def find_pixels(img_file, value=16383):
+    """
+    This function iterates over all the pixels in a fits image and returns the indices of the pixels that match the given value. Useful for checking for saturation. 
+    
+    Parameters:
+    img_file: Path to the fits file.
+    value: The value to search for in the img_median. Defaults to 16,383, which is the saturation limit for the CRED-2.
+    
+    Returns:
+    list: A list of indices (y,x) where the value is found.
+    """
+    saturated_indices = []
+
+    # Works if img_file is a cube of images, not just one frame
+    with fits.open(img_file) as hdul:
+        img_data = hdul[0].data
+        hdul.close()
+        img_median = np.median(img_data, axis=0)
+        # print(img_median.shape)
+
+        for i in range(img_median.shape[0]):
+            for j in range(img_median.shape[1]):
+                if img_median[i, j] == value:
+                    saturated_indices.append((i, j))
+
+    if len(saturated_indices) == 0:
+        print(f"No pixels found in {img_file} with value {value}.")
+    else:
+        # returns indices in the form (y,x)
+        return saturated_indices
+
+
 # Get intensity values from each spot in the reduced images. reduced_filename should just be the start of the name (leave out the last number, the angle). 
 def extract_intensities(reduced_filename, reduced_folder, lcenter, rcenter, maxradius, cutoff=5000):
-    """reduced_filename: a string indicating the first part of the file name that is the same for each file, like 'Reduced_DRRP_'.
+    """
+    Inputs:
+    reduced_filename: a string indicating the first part of the file name that is the same for each file, like 'Reduced_DRRP_'.
     reduced_folder: a string indicating the folder where these files are located. 
     lcenter and rcenter: the coordinates [y, x] for the location of each beam on the detector. 
     maxradius: an integer number of pixels to define as the radius of the beam.
@@ -92,11 +181,14 @@ def extract_intensities(reduced_filename, reduced_folder, lcenter, rcenter, maxr
     I_left = np.array([])
     I_right = np.array([])
     bad_indices = np.array([])
-    longtheta = np.linspace(0, np.pi, 46)
+    # longtheta = np.linspace(0, np.pi, 46)
+    angles = np.array([])
 
     for filename in sorted(os.listdir(reduced_folder), key = extract_number):
         if filename.startswith(reduced_filename):
+            angle = np.radians(extract_number(filename)/5) # get QWP 1 angle in radians
             with fits.open(os.path.join(reduced_folder, filename)) as hdul:
+                angles = np.append(angles, angle)
                 reduced_img_data = hdul[0].data
                 ys, xs, = np.indices(reduced_img_data.shape)
                 lradius = np.sqrt((ys-lcenter[0])**2+(xs-lcenter[1])**2)
@@ -124,9 +216,9 @@ def extract_intensities(reduced_filename, reduced_folder, lcenter, rcenter, maxr
     # Deletes the bad indices (caused by camera glitch or some other complication) from the data
     I_left = np.delete(I_left, bad_indices)
     I_right = np.delete(I_right, bad_indices)
-    new_angles = np.delete(longtheta, bad_indices)
+    # new_angles = np.delete(longtheta, bad_indices)
 
-    return I_left, I_right, new_angles, bad_indices
+    return I_left, I_right, angles, bad_indices
 
 
 # Gives the condition number of eventual Mueller matrix 
