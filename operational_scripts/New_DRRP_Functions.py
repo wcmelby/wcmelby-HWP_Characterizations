@@ -755,7 +755,8 @@ def q_ultimate_polarimetry(cal_angles, cal_vert_intensity, cal_hor_intensity, sa
 
     # The calibration matrix (should be close to identity) to see how well the parameters compensate
     MCal = q_calibrated_full_mueller_polarimetry(cal_angles, popt[0], popt[1], popt[2], popt[3], popt[4], cal_vert_intensity_normalized, cal_hor_intensity_normalized)
-    MCal = MCal/np.max(np.abs(MCal))
+    MCal = MCal/MCal[0,0] # Normalize by the first element
+    # MCal = MCal/np.max(np.abs(MCal))
     RMS_Error = RMS_calculator(MCal)
 
     # Normalize the sample intensities
@@ -765,7 +766,8 @@ def q_ultimate_polarimetry(cal_angles, cal_vert_intensity, cal_hor_intensity, sa
 
     # Use the parameters found above from curve fitting to construct the actual Mueller matrix of the sample
     MSample = q_calibrated_full_mueller_polarimetry(sample_angles, popt[0], popt[1], popt[2], popt[3], popt[4], sample_vert_intensity_normalized, sample_hor_intensity_normalized)
-    MSample = MSample/np.max(np.abs(MSample))
+    MSample = MSample/MSample[0,0] # Normalize by the first element
+    # MSample = MSample/np.max(np.abs(MSample))
 
     np.set_printoptions(suppress=True) # Suppresses scientific notation, keeps decimal format
 
@@ -900,9 +902,11 @@ def I_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
 
     # Optional print the calibration matrices (should be close to identity) to see how well the parameters compensate
     MlCal = I_calibrated_full_mueller_polarimetry(cal_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5], cal_lnormalized_intensity, LPA_angle=np.pi/2) # intensities don't need to be normalized here
-    MlCal = MlCal/np.max(np.abs(MlCal))
+    MlCal = MlCal/MlCal[0,0] # Normalize by the first element
+    # MlCal = MlCal/np.max(np.abs(MlCal))
     MrCal = I_calibrated_full_mueller_polarimetry(cal_angles, rpopt[0], rpopt[1], rpopt[2], rpopt[3], rpopt[4], rpopt[5], cal_rnormalized_intensity)
-    MrCal = MrCal/np.max(np.abs(MrCal))
+    MrCal = MrCal/MrCal[0,0] # Normalize by the first element
+    # MrCal = MrCal/np.max(np.abs(MrCal))
 
     # Calculate RMS error of each calibration matrix
     lRMS_Error = RMS_calculator(MlCal)
@@ -914,10 +918,12 @@ def I_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
 
     # Use the parameters found above from curve fitting to construct the actual Mueller matrix of the sample for left and right beams (Ml and Mr)
     Ml = I_calibrated_full_mueller_polarimetry(sample_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5], sample_lnormalized_intensity, LPA_angle=np.pi/2) # intensities don't need to be normalized
-    Ml = Ml/np.max(np.abs(Ml))
+    Ml = Ml/Ml[0,0] # Normalize by the first element
+    # Ml = Ml/np.max(np.abs(Ml))
 
     Mr = I_calibrated_full_mueller_polarimetry(sample_angles, rpopt[0], rpopt[1], rpopt[2], rpopt[3], rpopt[4], rpopt[5], sample_rnormalized_intensity)
-    Mr = Mr/np.max(np.abs(Mr))
+    Mr = Mr/Mr[0,0] # Normalize by the first element
+    # Mr = Mr/np.max(np.abs(Mr))
 
     np.set_printoptions(suppress=True)
 
