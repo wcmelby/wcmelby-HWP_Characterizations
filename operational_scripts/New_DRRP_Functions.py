@@ -8,6 +8,7 @@ import os
 import re
 from scipy.optimize import curve_fit
 import glob
+import math
 # import csv
 # import random
 # import matplotlib.pyplot as plt
@@ -771,15 +772,24 @@ def q_ultimate_polarimetry(cal_angles, cal_vert_intensity, cal_hor_intensity, sa
 
     np.set_printoptions(suppress=True) # Suppresses scientific notation, keeps decimal format
 
-    # Use the polar decomposition of the retarder matrix 
-    retarder_decomposed_MSample = decompose_retarder(MSample, normalize=True)
-    trace_argument = np.trace(retarder_decomposed_MSample)/2 - 1
-    trace_argument = np.clip(trace_argument, -1, 1) # prevent nan outputs by limiting values to the domain of arccos
-    retardance = np.arccos(trace_argument)/(2*np.pi) # Value in waves
+    M_r = decompose_retarder(MSample, normalize=True) # Use the polar decomposition to get retarder matrix
+    trace_argument = np.trace(M_r)/2 - 1
+    # trace_argument = np.clip(trace_argument, -1, 1) # prevent nan outputs by limiting values to the domain of arccos
+    with np.errstate(invalid='ignore'): # Suppress the RuntimeWarning for invalid values in arccos
+        retardance = np.arccos(trace_argument)/(2*np.pi)  # Value in waves
     # retardance = np.arccos(np.trace(retarder_decomposed_MSample)/2 - 1)/(2*np.pi) # Value in waves
 
-    Retardance_Error = propagated_error(retarder_decomposed_MSample, RMS_Error)
+    Retardance_Error = propagated_error(M_r, RMS_Error)/(2*np.pi) # value in waves
+
+    # if retardance and error can't be calculated with regular method, use another method
+    if math.isnan(retardance) or math.isnan(Retardance_Error):
+        M_r_normalized = M_r/np.max(np.abs(M_r))
+        z = M_r_normalized[3, 3]
+        sigmaz = 1-np.abs(MCal[3, 3]) # difference between last element of calibration matrix and identity matrix (1)
+        retardance = np.arccos(M_r_normalized[3, 3])/(2*np.pi)
+        Retardance_Error = np.sqrt((-1/np.sqrt(1-z**2))**2 * sigmaz**2)/(2*np.pi) # propagate error from arccos(z), convert radians to waves
     
+    # retardance and Retardance_Error in waves
     return MSample, retardance, MCal, RMS_Error, Retardance_Error, popt, ICal
 
 
