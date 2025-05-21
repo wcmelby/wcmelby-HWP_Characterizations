@@ -16,6 +16,11 @@ import math
 
 # Mueller matrix for a linear polarizer, with angle a between transmission axis and horizontal (radians)
 def linear_polarizer(a):
+    """
+    Mueller matrix for a linear polarizer
+    Inputs:
+    a: angle of the transmission axis, in raidans.
+    """
     M01 = np.cos(2*a)
     M02 = np.sin(2*a)
     M10 = np.cos(2*a)
@@ -31,8 +36,13 @@ def linear_polarizer(a):
                          [0, 0, 0, 0]])
 
 
-# Mueller matrix for a linear retarder (waveplate). Angle of fast axis a, retardance r in radians
 def linear_retarder(a, r):
+    """
+    Mueller matrix for a linear retarder (waveplate)
+    Inputs:
+    a: value for the angle of the fast axis, in radians. 
+    r: value for the retardance/phase shift, in radians. 
+    """
     M11 = np.cos(2*a)**2 + np.cos(r)*np.sin(2*a)**2
     M12 = np.cos(2*a)*np.sin(2*a)*(1-np.cos(r))
     M13 = -np.sin(2*a)*np.sin(r)
@@ -49,15 +59,26 @@ def linear_retarder(a, r):
                      [0, M31, M32, M33]])
 
 
-# Sorting function for extracting filenames based on last number in the filename (the angle of rotation)
 def extract_number(filename):
+    """
+    Sorting function to organize filenames based on the last number in the filename. 
+    For DRRP data, the last number should be the angle of rotation. 
+    """
     match = re.findall(r'\d+(?:\.\d+)?', filename)
     if match:
         return float(match[-1])
 
 
-    # Function to subtract dark frames from raw frames. The new reduced images are saved to a different folder
 def dark_subtraction(image_file, dark_file, old_directory, new_directory):
+    """
+    Subtract a dark frame from a raw image in fits file format. 
+    The new "reduced" images are saved to a different folder. 
+    Inputs:
+    image_file: string containing the first part of the file name, such as "Data_1100nm_"
+    dark_file: full file name of the dark frame
+    old_directory: file path to the folder containing the image file
+    new_directory: file path to a folder where the dark subtracted image will be saved. 
+    """
     # Open the dark image and extract pixel values
     fits.open(dark_file)
     dark = fits.getdata(dark_file)
@@ -163,9 +184,9 @@ def find_pixels(img_file, value=16383):
         return saturated_indices
 
 
-# Get intensity values from each spot in the reduced images. reduced_filename should just be the start of the name (leave out the last number, the angle). 
 def extract_intensities(reduced_filename, reduced_folder, lcenter, rcenter, maxradius, cutoff=5000):
     """
+    Get intensity from an image as the sum of pixels within a certain radius on the detector. 
     Inputs:
     reduced_filename: a string indicating the first part of the file name that is the same for each file, like 'Reduced_DRRP_'.
     reduced_folder: a string indicating the folder where these files are located. 
@@ -222,8 +243,10 @@ def extract_intensities(reduced_filename, reduced_folder, lcenter, rcenter, maxr
     return I_left, I_right, angles, bad_indices
 
 
-# Gives the condition number of eventual Mueller matrix 
 def condition_number(matrix):
+    """
+    Gives the condition number of eventual Mueller matrix. 
+    """
     minv = np.linalg.pinv(matrix)
 
     # Compute maximum norm
