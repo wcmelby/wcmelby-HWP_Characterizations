@@ -9,10 +9,7 @@ import re
 from scipy.optimize import curve_fit
 import glob
 import math
-# import csv
-# import random
-# import matplotlib.pyplot as plt
-# import textwrap
+import json
 
 # Mueller matrix for a linear polarizer, with angle a between transmission axis and horizontal (radians)
 def linear_polarizer(a):
@@ -291,14 +288,6 @@ def q_calibrated_full_mueller_polarimetry(thetas, a1, w1, w2, r1, r2, I_vert, I_
     th = thetas
 
     # Values normalized by q_ultimate_polarimetry
-    # old version
-    # unnormalized_Q = I_hor - I_vert   # Difference in intensities measured by the detector
-    # unnormalized_I_total = I_vert + I_hor
-    # Q = unnormalized_Q/np.max(unnormalized_I_total)
-    # I_total = unnormalized_I_total/np.max(unnormalized_I_total)
-    # Both Q and I should be normalized by the total INPUT flux, but we don't know this value. The closest we can guess is the maximum of the measured intensity
-    # This assumes the input flux is constant over time. Could be improved with a beam splitter that lets us monitor the input flux over time
-
     # values don't need to be normalized here, assuming the input intensities are already normalized by total intensity
     I_total = I_vert + I_hor
     Q = I_hor - I_vert
@@ -343,40 +332,6 @@ B = np.array([[1], [0], [0], [0]])
 C = np.array([0, 1, 0, 0])
 
 
-# In order, the calibration parameters are LP1 angle, QWP1 axis angle, QWP2 axis angle, QWP1 retardance, QWP2 retrdance
-# def q_calibration_function(t, a1, w1, w2, r1, r2):
-#     prediction = [None]*len(t)
-#     for i in range(len(t)):
-#         prediction[i] = float(C @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M_identity @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
-#     return prediction
-
-
-# Basically the same as above, but with an optional input matrix to simulate data
-# def q_output_simulation_function(t, a1, w1, w2, r1, r2, M_in=None):
-#     if M_in is None:
-#         M = M_identity
-#     else:
-#         M = M_in
-
-#     prediction = [None]*len(t)
-#     for i in range(len(t)):
-#         prediction[i] = float(C @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
-#     return prediction
-
-
-# Function that is useful for generating intensity values for a given sample matrix and offset parameters
-# def I_output_simulation_function(t, a1, w1, w2, r1, r2, M_in=None):
-#     if M_in is None:
-#         M = M_identity
-#     else:
-#         M = M_in
-
-#     prediction = [None]*len(t)
-#     for i in range(len(t)):
-#         prediction[i] = float(A  @ linear_retarder(5*t[i]+w2, np.pi/2+r2) @ M @ linear_retarder(t[i]+w1, np.pi/2+r1) @ linear_polarizer(a1) @ B)
-#     return prediction
-
-
 # Calculate the root-mean-square error of the calibration matrix by comparing with the identity matrix
 def RMS_calculator(calibration_matrix):
     """Calculates the root-mean-square error of a calibration matrix by comparing with the identity matrix.
@@ -415,7 +370,7 @@ def propagated_error(M_R, RMS):
     Returns
     -------
     float
-        RMS error in the retardance value. 
+        RMS error in the retardance value in radians. 
     """
     # return RMS/np.sqrt(1-(np.trace(M_R)/2-1)**2) # These two equations are equivalent
     x = np.trace(M_R)
@@ -773,7 +728,7 @@ def q_ultimate_polarimetry(cal_angles, cal_vert_intensity, cal_hor_intensity, sa
     parameter_bounds = ([-np.pi, -np.pi, -np.pi, -np.pi/2, -np.pi/2], [np.pi, np.pi, np.pi, np.pi/2, np.pi/2])
 
     # Find parameters from calibration 
-    normalized_QCal = QCal/(2*ICal) # This should correctly normalize from 0 to 0.5 for each angle
+    normalized_QCal = QCal/(2*ICal) # This should correctly normalize from 0 to 0.5 for each angle (first linear polarizer reduces input intensity by half)
     popt, pcov = curve_fit(q_output_simulation_function, cal_angles, normalized_QCal, p0=initial_guess, bounds=parameter_bounds)
     # print(popt, "Fit parameters for a1, w1, w2, r1, and r2. 1 for generator, 2 for analyzer")
 
@@ -922,16 +877,8 @@ def I_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
     # Find parameters from calibration of the left spot
     lpopt, lpcov = curve_fit(I_vertical_calibration_function, cal_angles, cal_lnormalized_intensity, p0=initial_guess, bounds=parameter_bounds)
 
-    # plt.plot(cal_angles, lnormalized_intensity, label='l measured (normalized)', marker='o')
-    # plt.plot(cal_angles, I_vertical_calibration_function(cal_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5]), label='l predicted', marker='o')
-    # plt.legend()
-
     # Find parameters from calibration of the right spot
     rpopt, rpcov = curve_fit(I_horizontal_calibration_function, cal_angles, cal_rnormalized_intensity, p0=initial_guess, bounds=parameter_bounds)
-
-    # plt.plot(cal_angles, rnormalized_intensity, label='r measured (normalized)', marker='o')
-    # plt.plot(cal_angles, I_horizontal_calibration_function(cal_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5]), label='r predicted', marker='o')
-    # plt.legend()
 
     # Optional print the calibration matrices (should be close to identity) to see how well the parameters compensate
     MlCal = I_calibrated_full_mueller_polarimetry(cal_angles, lpopt[0], lpopt[1], lpopt[2], lpopt[3], lpopt[4], lpopt[5], cal_lnormalized_intensity, LPA_angle=np.pi/2) # intensities don't need to be normalized here
@@ -966,20 +913,113 @@ def I_ultimate_polarimetry(cal_angles, cal_left_intensity, cal_right_intensity, 
 
     # retardance = np.arccos(np.trace(normalized_decompose_retarder(r_decomposed_MSample))/2 - 1)/(2*np.pi) # Value in waves
     ltrace_argument = np.trace(l_retarder_decomposed_MSample)/2 - 1
-    ltrace_argument = np.clip(ltrace_argument, -1, 1) # prevent nan outputs by limiting values to the domain of arccos
+    # ltrace_argument = np.clip(ltrace_argument, -1, 1) # prevent nan outputs by limiting values to the domain of arccos
     rtrace_argument = np.trace(r_retarder_decomposed_MSample)/2 - 1
-    rtrace_argument = np.clip(rtrace_argument, -1, 1)
+    # rtrace_argument = np.clip(rtrace_argument, -1, 1)
+    with np.errstate(invalid='ignore'): # Suppress the RuntimeWarning for invalid values in arccos
+        lretardance = np.arccos(ltrace_argument)/(2*np.pi)  # Value in waves
+        rretardance = np.arccos(rtrace_argument)/(2*np.pi)
 
-    lretardance = np.arccos(ltrace_argument)/(2*np.pi) # Value in waves
-    rretardance = np.arccos(rtrace_argument)/(2*np.pi)
+    lRetardance_Error = propagated_error(l_retarder_decomposed_MSample, lRMS_Error)/(2*np.pi) # value in waves
+    rRetardance_Error = propagated_error(r_retarder_decomposed_MSample, rRMS_Error)/(2*np.pi) # value in waves
 
-    lRetardance_Error = propagated_error(l_retarder_decomposed_MSample, lRMS_Error)
-    rRetardance_Error = propagated_error(r_retarder_decomposed_MSample, rRMS_Error)
+    # if retardance and error can't be calculated with regular method, use another method (left side)
+    if math.isnan(lretardance) or math.isnan(lRetardance_Error):
+        lM_r_normalized = l_retarder_decomposed_MSample/np.max(np.abs(l_retarder_decomposed_MSample))
+        z = lM_r_normalized[3, 3]
+        sigmaz = 1-np.abs(MlCal[3, 3]) # difference between last element of calibration matrix and identity matrix (1)
+        lretardance = np.arccos(lM_r_normalized[3, 3])/(2*np.pi)
+        lRetardance_Error = np.sqrt((-1/np.sqrt(1-z**2))**2 * sigmaz**2)/(2*np.pi) # propagate error from arccos(z), convert radians to waves
 
-    # Extract retardance from the last entry of the mueller matrix, which should just be cos(phi)
-    # lretardance = np.arccos(Ml[3,3])/(2*np.pi)
-    # rretardance = np.arccos(Mr[3,3])/(2*np.pi)
-
-    # avg_retardance = (lretardance+rretardance)/2
+    # same for the right side
+    if math.isnan(rretardance) or math.isnan(rRetardance_Error):
+        rM_r_normalized = r_retarder_decomposed_MSample/np.max(np.abs(r_retarder_decomposed_MSample))
+        z = rM_r_normalized[3, 3]
+        sigmaz = 1-np.abs(MrCal[3, 3])
+        rretardance = np.arccos(rM_r_normalized[3, 3])/(2*np.pi)
+        rRetardance_Error = np.sqrt((-1/np.sqrt(1-z**2))**2 * sigmaz**2)/(2*np.pi)
 
     return Ml, Mr, lretardance, rretardance, lRetardance_Error, rRetardance_Error, MlCal, MrCal, lRMS_Error, rRMS_Error, lpopt, rpopt, Cal_I_total_meas
+
+
+def multi_analysis(wavelengths, cal_results, sample_results, method):
+    """
+    Specify data reduction method as 'I' or 'q'.
+    Parameters
+    ----------
+    wavelengths : list of input wavelengths, like [1400, 1500, 1600]
+    cal_results : dictionary with calibration data or path to a JSON file
+    sample_results : dictionary with sample data or path to a JSON file
+    method : string, 'I' or 'q'. Specifies which method to use for data reduction. 
+
+    Returns 
+    -------
+    polarimetry_results : A dictionary with the results for each wavelength.
+    """
+    # Load JSON data if file paths are provided
+    if isinstance(cal_results, str):
+        with open(cal_results, 'r') as f:
+            cal_results = json.load(f)
+    
+    if isinstance(sample_results, str):
+        with open(sample_results, 'r') as f:
+            sample_results = json.load(f)
+
+    # Dictionary to store results for each wavelength
+    polarimetry_results = {}
+
+    # Loop over the wavelengths
+    for wl in wavelengths:
+        # Retrieve extracted data (ensure it has been stored in the `results`)
+        Cal_theta = np.array(cal_results.get(f'Cal_theta{wl}', []))
+        Cal_Il = np.array(cal_results.get(f'Cal_Il_{wl}', []))
+        Cal_Ir = np.array(cal_results.get(f'Cal_Ir_{wl}', []))
+
+        theta = np.array(sample_results.get(f'theta{wl}', []))
+        Il = np.array(sample_results.get(f'Il_{wl}', []))
+        Ir = np.array(sample_results.get(f'Ir_{wl}', []))
+        
+        # Flags for missing data
+        calibration_data_missing = any(len(arr) == 0 for arr in [Cal_theta, Cal_Il, Cal_Ir])
+        waveplate_data_missing = any(len(arr) == 0 for arr in [theta, Il, Ir])
+
+        # Check missing data and print appropriate message
+        if calibration_data_missing:
+            print(f"Missing calibration data for wavelength {wl}, skipping...")
+
+        if waveplate_data_missing:
+            print(f"Missing waveplate sample data for wavelength {wl}, skipping...")
+
+        # Skip processing if any data is missing
+        if calibration_data_missing or waveplate_data_missing:
+            continue
+
+        # Run the `I_ultimate_polarimetry` function
+        if method == 'I':
+            data = I_ultimate_polarimetry(Cal_theta, Cal_Il, Cal_Ir, theta, Il, Ir)
+        elif method == 'q':
+            data = q_ultimate_polarimetry(Cal_theta, Cal_Il, Cal_Ir, theta, Il, Ir)
+        else:
+            print("Invalid method specified. Please choose 'I' or 'q'.")
+            return None
+
+        # Store the result for the current wavelength
+        polarimetry_results[wl] = data
+
+    return polarimetry_results
+
+
+def coefficient_of_variation(intensities: np.ndarray) -> float:
+    """
+    Computes the coefficient of variation (CV) for a given array of intensity values.
+
+    Parameters:
+    intensities (np.ndarray): Array of intensity values.
+
+    Returns:
+    float: The coefficient of variation (standard deviation / mean) as a percentage.
+    """
+    mean_intensity = np.mean(intensities)
+    std_intensity = np.std(intensities, ddof=1)  # Use ddof=1 for sample standard deviation
+    CV = std_intensity / mean_intensity if mean_intensity != 0 else np.nan  # Avoid division by zero
+    return CV*100 # Convert to percentage
